@@ -10,31 +10,54 @@
 \usepackage{enumerate}
 \usepackage{pdflscape}
 
+\newcommand{\racomment}[1]{{\color{red}#1}}
+
+% Affiliations
 \newcommand{\columbia}{1}
 \newcommand{\simons}{2}
 \newcommand{\nyu}{3}
 \newcommand{\cca}{4}
 \newcommand{\mpia}{5}
+
+% Missions
 \newcommand{\Kepler}{{\it Kepler}}
 \newcommand{\kepler}{\Kepler}
 \newcommand{\corot}{{\it CoRoT}}
 \newcommand{\Ktwo}{{\it K2}}
 \newcommand{\ktwo}{\Ktwo}
 \newcommand{\TESS}{{\it TESS}}
+\newcommand{\tess}{{\it TESS}}
 \newcommand{\LSST}{{\it LSST}}
+\newcommand{\lsst}{{\it LSST}}
 \newcommand{\Wfirst}{{\it Wfirst}}
+\newcommand{\wfirst}{{\it Wfirst}}
 \newcommand{\SDSS}{{\it SDSS}}
+\newcommand{\sdss}{{\it SDSS}}
 \newcommand{\PLATO}{{\it PLATO}}
+\newcommand{\plato}{{\it PLATO}}
+\newcommand{\TGAS}{{\it TGAS}}
+\newcommand{\tgas}{{\it TGAS}}
+\newcommand{\APOGEE}{{\it APOGEE}}
+\newcommand{\apogee}{{\it APOGEE}}
+\newcommand{\gaia}{{\it Gaia}}
+\newcommand{\Gaia}{{\it Gaia}}
+
+% Stellar parameters
 \newcommand{\Teff}{$T_{\mathrm{eff}}$}
 \newcommand{\teff}{$T_{\mathrm{eff}}$}
 \newcommand{\FeH}{[Fe/H]}
 \newcommand{\feh}{[Fe/H]}
-\newcommand{\ie}{{\it i.e.}}
-\newcommand{\eg}{{\it e.g.}}
-\newcommand{\etal}{{\it et al.}}
 \newcommand{\logg}{log \emph{g}}
 \newcommand{\dnu}{$\Delta \nu$}
 \newcommand{\numax}{$\nu_{\mathrm{max}}$}
+
+% Common expressions
+\newcommand{\ie}{{\it i.e.}}
+\newcommand{\eg}{{\it e.g.}}
+\newcommand{\etal}{{\it et al.}}
+
+% Paper-specific
+\newcommand{\nkictags}{2000}
 
 \begin{document}
 
@@ -58,8 +81,21 @@ University, NY, NY}
 NY, NY}
 
 \begin{abstract}
-Words go here.
+% Aims
+Stellar age underpins a wide range of astronomical applications, yet
+remains one of the most challenging properties to infer.
+% Method
+Competing dating methods with different observational inputs often produce
+    wildly inconsistent age estimates.
+In this work we attempt to combine multiple methods into one coherent model
+    and calibrate that model using galactic dynamics --- a well understood
+    physical process.
+We identify a sample of stars with at least two of the following dating
+    methods available: rotation-dating, isochronal-dating,
+    asteroseismic-dating and dynamical-dating.
+% Results
 \end{abstract}
+
 
 \section{Introduction}
 \label{sec:intro}
@@ -68,17 +104,26 @@ The processes behind the formation of the Milky Way and the objects within it
 are some of the most elusive and complicated topics in astronomy today,
 connected by a common theme: stellar ages.
 Ages provide the key to understanding the evolution of all astrophysical
-objects, but age, unfortunately, one of the most difficult stellar properties
-to measure.
+objects, but age is, unfortunately, one of the most difficult stellar
+properties to measure.
 Different dating methods often produce inconsistent predictions for the age of
 the same star.
 This is in part because the underlying processes generating the evolution of
 the observable properties are different and in part because our understanding
 of the underlying physics is flawed or incomplete.
-In table \ref{tab:dating_methods} we present a list of dating methods, the
-main observables associated with that method, the underlying physics driving
-the changing observables, the types of star the method applies to and the
-empirical or physical nature of the model.
+The various available dating methods can be categorised by the underlying
+physical process they trace --- the radial extent of the hydrogen-burning core
+or the evolving magnetic dynamo for example.
+In addition, they can be classified by their level of empiricism, \ie\ the
+number of free parameters that need to tuned when calibrating these models.
+The physics behind orbital heating, for example, is very well understood and
+has only one tunable parameter.
+On the other hand, magnetic activity evolution is poorly understood and the
+dating methods that are based on it are often entirely empirical.
+In table \ref{tab:dating_methods} we provide an overview of various dating
+methods, the main observables associated with them, the underlying physics
+driving the changing observables, the types of star the method applies to and
+the empirical or physical nature of the model.
 
 \begin{landscape}
 \begin{table}
@@ -127,6 +172,10 @@ empirical or physical nature of the model.
 \label{tab:dating_methods}
 \end{landscape}
 
+In this paper we focus on four of these dating methods: rotation,
+asteroseismology, isochrones and galactic dynamics.
+A brief overview of each of these methods is provided in below.
+
 \subsection{Rotation-Dating}
 \label{sec:rotation}
 
@@ -171,9 +220,64 @@ continue to demonstrate that the relation between rotation period and age
 holds true while theorists \citep[\eg][]{Matt2012, Epstein2014} modify and
 extend the efforts to produce physical models of this phenomenon.
 
+Not only do a number of dating methods exists, several different models are
+often available for the same dating method.
+In the case of rotation-dating...
+
+\racomment{What happens when you can't measure a rotation period?}
+\racomment{What about the difference in physics that you are probing?}
+
+\subsection{Asteroseismology}
+
+\subsection{Isochrones}
+
+\subsection{Galactic Dynamics}
+
+This paper is laid out as follows.
+% In \textsection \ref{sec:dating_methods} we provide an overview of each dating
+% method used in this paper and demonstrate their inconsistency in age
+% predictions.
+In \textsection \ref{sec:data} we describe the data used to calibrate our new
+model, which is described in \textsection \ref{sec:method}.
+In \textsection \ref{sec:results} we present a new catalogue of ages.
+
+\section{Data}
+\label{sec:data}
+We assembled a sample of stars that have at least two of the four dating
+methods available.
+Our main asteroseismic sample targets comprise the $~$500 short cadence
+\kepler\ prime targets.
+These stars all have light curves and therefore rotation periods (or potential
+rotation periods).
+The majority are also in Gaia DR1, therefore have parallaxes, positions and
+2-dimensional velocities, which can provide constraints on their vertical
+actions.
+A subset of these stars have spectroscopic information and therefore make
+excellent isochronal targets.
+Our main rotation sample is the \nkictgas\ stars in both the \kepler\ input
+catalogue (KIC) and \TGAS.
+These stars have potential rotation periods, parallaxes, positions and
+2-dimensional velocities.
+Our main dynamics data set is the intersection of the \apogee\ and \tgas\
+catalogues.
+The majority of these stars have ages from {\tt the cannon} \cite{Ness2015},
+plus \gaia\ parallaxes, positions and proper motions as well as radial
+velocities, providing vertical actions calculated from the full 3-dimensional
+phase-space.
+They are mostly red giants.
+
 \section{Method}
+\label{sec:method}
+
+In order to establish the level of inconsistency between dating methods, we
+first compare predictions for each of the above data sets.
+This is purely an illustrative test as these dating methods are not always
+independent, for example many rotation-dating models are calibrated using
+asteroseismic age predictions.
+For the asteroseismic sample we find that
 
 \section{Results and Discussion}
+\label{sec:results}
 
 \section{Conclusions}
 
@@ -187,6 +291,7 @@ Support for MAST for non-HST data is provided by the NASA Office of Space
 Science via grant NNX09AF08G and by other grants and contracts.
 This paper includes data collected by the Kepler mission. Funding for the
 Kepler mission is provided by the NASA Science Mission directorate.
+\racomment{Add TGAS \& Apogee acknowledgements.}
 
 \bibliographystyle{plainnat}
 \bibliography{chronometer}
