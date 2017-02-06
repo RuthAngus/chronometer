@@ -22,6 +22,8 @@
 % Missions
 \newcommand{\Kepler}{{\it Kepler}}
 \newcommand{\kepler}{\Kepler}
+\newcommand{\kic}{\KIC}
+\newcommand{\KIC}{\KIC}
 \newcommand{\corot}{{\it CoRoT}}
 \newcommand{\Ktwo}{{\it K2}}
 \newcommand{\ktwo}{\Ktwo}
@@ -41,6 +43,8 @@
 \newcommand{\apogee}{{\it APOGEE}}
 \newcommand{\gaia}{{\it Gaia}}
 \newcommand{\Gaia}{{\it Gaia}}
+\newcommand{\rave}{{\it RAVE}}
+\newcommand{\Rave}{{\it RAVE}}
 
 % Stellar parameters
 \newcommand{\Teff}{$T_{\mathrm{eff}}$}
@@ -57,7 +61,7 @@
 \newcommand{\etal}{{\it et al.}}
 
 % Paper-specific
-\newcommand{\nkictags}{2000}
+\newcommand{\nkictgas}{2000}
 
 \begin{document}
 
@@ -65,7 +69,7 @@
 
 \author{%
     Ruth Angus\altaffilmark{\columbia,}\altaffilmark{\simons},
-   David Hogg\altaffilmark{\nyu,}\altaffilmark{\mpia,}\altaffilmark{\cca},
+   David Hogg\altaffilmark{\nyu,}\altaffilmark{\cca,}\altaffilmark{\mpia},
     \etal
    % Melissa Ness\altaffilmark{\mpia},
    % David Kipping\altaffilmark{\columbia}, \etal
@@ -166,6 +170,7 @@ the empirical or physical nature of the model.
     Nuclear isotopes & ? & ? & ? & ? \\
     Unusual HRD objects & $T_{\mathrm{eff}}$, $M_v$ & Mergers, ? &
     Special cases & ? \\
+    Twins & ? & ? & ? & ? \\
 \end{tabular}
 \end{center}
 \end{table}
@@ -258,13 +263,33 @@ Our main rotation sample is the \nkictgas\ stars in both the \kepler\ input
 catalogue (KIC) and \TGAS.
 These stars have potential rotation periods, parallaxes, positions and
 2-dimensional velocities.
-Our main dynamics data set is the intersection of the \apogee\ and \tgas\
-catalogues.
-The majority of these stars have ages from {\tt the cannon} \cite{Ness2015},
-plus \gaia\ parallaxes, positions and proper motions as well as radial
-velocities, providing vertical actions calculated from the full 3-dimensional
-phase-space.
-They are mostly red giants.
+Some of these stars, particularly those with confirmed planets, also have
+spectroscopic information and could provide isochronal ages.
+Our main isochronal data set is the intersection of the \apogee\ and \rave\
+catalogues with \tgas.
+Relatively precise isochronal ages can be inferred from the spectroscopic
+stellar properties of these stars, the majority which have ages from {\it the
+cannon} \citep{Ness2015, Casey2016}.
+They also have \gaia\ parallaxes, positions and proper motions as well as
+radial velocities, providing vertical actions calculated from the full
+3-dimensional phase-space.
+
+\begin{landscape}
+\begin{table}
+\begin{center}
+\caption{A summary of the data sets used in this project}
+\begin{tabular}{lccc}
+    Sample & Catalogue intersection &  Methods available \\
+    \hline
+    Asteroseismic & \citet{Chaplin2014} \& TGAS & Asteroseismology, rotation,
+    isochrones, dynamics \\
+    Rotational & KIC \& TGAS & Rotation, isochrones, dynamics \\
+    Isochronal & RAVE, APOGEE \& TGAS & Isochrones, dynamics \\
+\end{tabular}
+\end{center}
+\end{table}
+\label{tab:data}
+\end{landscape}
 
 \section{Method}
 \label{sec:method}
