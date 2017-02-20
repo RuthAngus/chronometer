@@ -10,7 +10,13 @@ from galpy.df import quasiisothermaldf
 aA = actionAngleStaeckel(pot=MWPotential2014, delta=0.45, c=True)
 
 
-def calc_dispersion(time, sz0, t1, tm, beta, R0, Rc, Rsz):
+def calc_dispersion(pars, time):
+    """
+    sz0 = The z-dispersion at time = 0
+    t1 =
+    """
+    sz0, t1, beta, Rsz = pars
+    tm, R0, Rc = 10, 1., 1.
     return sz0 * ((time + t1)/(tm + t1))**beta * np.exp((R0 - Rc)/Rsz)
 
 
@@ -32,12 +38,20 @@ if __name__ == "__main__":
     sr = 34.
     sz = 25.1
 
-    sigma_z = calc_dispersion(time, sz0, t1, tm, beta, R0, Rc, hsz)
-    sigma_r = calc_dispersion(time, sr0, t1, tm, beta, R0, Rc, hsr)
+    zpars = [sz0, t1, beta, R0, Rc, hsz]
+    rpars = [sr0, t1, beta, R0, Rc, hsr]
+
+    sigma_z = calc_dispersion(zpars, time)
+    sigma_r = calc_dispersion(rpars, time)
+    print(sigma_z)
 
     plt.clf()
-    plt.plot(time, sigma_z)
-    plt.savefig("test")
+    plt.plot(np.log(time), sigma_z)
+    plt.xlabel("log(Time)")
+    plt.ylabel("Sigma_z")
+    plt.savefig("age_dispersion")
+    assert 0
+
 
     # Bovy example
     aA = actionAngleAdiabatic(pot=MWPotential2014, c=True)
