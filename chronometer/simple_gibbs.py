@@ -145,7 +145,6 @@ def gibbs(par_init0, par_init1, x, y, yerr, niter):
         print("Model {0}, Iteration {1}".format(1, i))
         p1, flat1 = gibbs_internal(p0, p1, x, y, yerr, 1)
 
-    print(np.shape(flat0), np.shape(flat1))
     flat = np.concatenate((flat0, flat1), axis=1)
     fig = corner.corner(flat)
     fig.savefig("corner")

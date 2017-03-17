@@ -9,6 +9,8 @@ from galpy.actionAngle import actionAngleStaeckel, actionAngleAdiabatic
 from galpy.df import quasiisothermaldf
 aA = actionAngleStaeckel(pot=MWPotential2014, delta=0.45, c=True)
 
+from mcquillan_granola import calc_bin_dispersion
+
 
 def calc_dispersion(pars, time):
     """
@@ -38,18 +40,30 @@ if __name__ == "__main__":
     sr = 34.
     sz = 25.1
 
-    zpars = [sz0, t1, beta, R0, Rc, hsz]
-    rpars = [sr0, t1, beta, R0, Rc, hsr]
+    zpars = [sz0, t1, beta, hsz]
+    rpars = [sr0, t1, beta, hsr]
 
     sigma_z = calc_dispersion(zpars, time)
     sigma_r = calc_dispersion(rpars, time)
     print(sigma_z)
 
+    # load data
+    DATA_DIR = "/Users/ruthangus/granola/granola/data"
+    d = pd.read_csv("ages_and_actions.csv")
+    m = (d.age.values > 0) * (d.age.values < 14)
+    df = d.iloc[m]
+
+    ages, dispersions, Ns = calc_bin_dispersion(df.age.values, df.Jz.values,
+                                                8)
+    d_err = dispersions / (2 * Ns - 2)**.5
+
     plt.clf()
     plt.plot(np.log(time), sigma_z)
+    plt.plot(ages, dispersions)
     plt.xlabel("log(Time)")
-    plt.ylabel("Sigma_z")
+    plt.ylabel("dispersion")
     plt.savefig("age_dispersion")
+
     assert 0
 
 

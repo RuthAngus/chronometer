@@ -27,8 +27,7 @@ def gc_model(params, bv):
         A an array containing colour.
     """
     a, b, n, age = np.exp(params)
-    # return (np.log(p) - np.log(a) - b*np.log(bv - .4))/n
-    return n*np.log(age) + np.log(a) + b*np.log(bv - .4)
+    return a*(age*1e3)**n * (bv[0] - .4)**b
 
 
 def gc_lnlike(params, data, data_err):
@@ -112,46 +111,37 @@ def lnprob(params, *args, fit_parallax=True, gyro=True,
         gc_lnprior(gyro_params) + iso_lnprior(iso_params)
 
 
-def fit_star():
-    bands = dict(
-            J=(star.jmag, star.jmag_err),
-            H=(star.hmag, star.hmag_err),
-            K=(star.kmag, star.kmag_err),
-        )
-    args = (bands, parallax, period, bv)
+def distance_modulus(M, D):
+    return 5*np.log10(D) - 5 + M
 
 
 if __name__ == "__main__":
 
-    # Testing the isochrones likelihood function.
-    mist = MIST_Isochrone()
-    mod = StarModel(mist, Teff=(5700, 100), logg=(4.5, 0.1), feh=(0.0, 0.1))
+    a, b, n = .7725, .601, .5189
+    age = 4.56
+    mass, feh, d, Av = 1., 0., 10., 0.
+    params = np.log(np.array([a, b, n, age, mass, feh, d, Av]))
 
-    import time
-    start = time.time()
-    # mass, age, metalicity, distance, extinction
-    p0 = [0.8, 9.5, 0.0, 200, 0.2]
-    print(mod.lnlike(p0))
-    end = time.time()
-    print(end - start, "seconds")
+    # test on the Sun first.
+    MJ = 3.711  # absolute magnitudes
+    MH = 3.453
+    MK = 3.357
+    J = distance_modulus(MJ, 10)
+    H = distance_modulus(MH, 10)
+    K = distance_modulus(MK, 10)
 
-    start = time.time()
-    p0 = [0.7, 9.5, 0.0, 200, 0.2]
-    print(mod.lnlike(p0))
-    end = time.time()
-    print(end - start, "seconds")
+    bands = dict(J=(J, .01), H=(H, .01), K=(K, .01),)
+    parallax = (.1, .001)
+    period = (26., 1.)
+    bv = (.65, .01)
+    args = (bands, parallax, period, bv)
 
-    start = time.time()
-    p0 = [0.6, 9.5, 0.0, 200, 0.2]
-    print(mod.lnlike(p0))
-    end = time.time()
-    print(end - start, "seconds")
-    assert 0
+    # test the gyro model
+    gyro_params = np.log(np.array([a, b, n, 4.56]))
+    print(gc_model(gyro_params, bv))
+
 
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
-
-    params = np.log([.7725, .601, .5189])
-
     # load data.
     cs = pd.read_csv(os.path.join(DATA_DIR, "clusters.csv"))
     m = (.6 < cs.bv.values) * (cs.bv.values < .7)
@@ -160,33 +150,3 @@ if __name__ == "__main__":
     bvs = cs.bv.values
     ages = cs.age.values * 1e3
     age_err = cs.age_err.values
-
-    print(gc_lnlike(params, [periods, bvs], ages, age_err))
-
-    # Run emcee
-    ndim, nwalkers, nsteps = len(params), 24, 10000
-    p0 = [1e-4*np.random.rand(ndim) + params for i in range(nwalkers)]
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, gc_lnprob,
-                                    args=[[periods, bvs], ages, age_err])
-    pos, _, _ = sampler.run_mcmc(p0, 5000)
-    sampler.reset()
-    sampler.run_mcmc(pos, nsteps)
-    flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
-    fig = corner.corner(np.exp(flat), labels=["a", "b", "n"])
-    fig.savefig("corner_test")
-    results = [np.median(flat[:, 0]), np.median(flat[:, 1]),
-               np.median(flat[:, 2])]
-    print(results)
-
-    # Plot data with model
-    xs = np.linspace(min(periods), max(periods), 100)
-    init = gc_model(params, [xs, .65])
-    fit = gc_model(results, [xs, .65])
-    plt.clf()
-    plt.plot(init, np.log(xs), label="init")
-    plt.plot(fit, np.log(xs), label="fit")
-    plt.legend()
-    plt.plot(np.log(ages), np.log(periods), "k.")
-    plt.xlabel("age")
-    plt.ylabel("period")
-    plt.savefig("model")
