@@ -92,8 +92,8 @@ def lnprob(params, mods, *args, gyro=True, iso=True):
     iso_params = np.array([mass, age, feh, d, Av])
     gyro_params = np.array([a, b, n, age])
 
-    return iso_lnlike(iso_params, mods) + gc_lnlike(gyro_params, args) + \
-        lnprior(params)
+    return iso_lnlike(iso_params, mods) + gc_lnlike(gyro_params, period, bv) \
+        + lnprior(params)
 
 
 def distance_modulus(M, D):
@@ -105,7 +105,8 @@ if __name__ == "__main__":
     a, b, n = .7725, .601, .5189
     age = 4.56
     mass, feh, d, Av = 1., 0., 10., 0.
-    params = np.log(np.array([a, b, n, age, mass, feh, d, Av]))
+    params = np.array([a, b, n, np.log(age), np.log(mass), feh, np.log(d),
+                       Av])
 
     N = 10
     _1s = np.ones(N)  # make fake data arrays, length 10.
@@ -126,7 +127,7 @@ if __name__ == "__main__":
     # print(gc_model(gyro_params, bv[0]))
 
     # test the gyro lhf
-    # print(gc_lnlike(gyro_params, period, bv))
+    print("gyro_lnlike = ", gc_lnlike(gyro_params, period, bv))
 
     # test the iso_lnlike
     mist = MIST_Isochrone()
@@ -147,11 +148,12 @@ if __name__ == "__main__":
     print("preamble time = ", end - start)
 
     start = time.time()
-    print(iso_lnlike(iso_params, mods))
+    print("iso_lnlike = ", iso_lnlike(iso_params, mods))
     end = time.time()
     print("lhf time = ", end - start)
 
     # test the lnprob.
+    print("lnprob = ", lnprob(params, mods, period, bv, gyro=True, iso=True))
 
 
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
