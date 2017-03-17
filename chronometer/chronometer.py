@@ -3,6 +3,7 @@
 
 import os
 
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -27,25 +28,40 @@ def gc_model(params, bv):
         A an array containing colour.
     """
     a, b, n, age = np.exp(params)
-    return a*(age*1e3)**n * (bv[0] - .4)**b
+    return a*(age*1e3)**n * (bv - .4)**b
 
 
-def gc_lnlike(params, data, data_err):
+def gc_lnlike(params, period, bv):
     """
     Probability of age and model parameters given rotation period and colour.
     parameters:
     ----------
     params: (array)
         The array of log parameters: a, b, n, age.
-    data: (array)
-        an array containing rotation periods and B-V colour.
-    data_err: (array)
-        an array containing rotation period and B-V uncertainties.
+    period: (tuple)
+        The rotation period and period uncertainty in days
+    bv: (tuple)
+        The B-V colour and colour uncertainty.
     """
-    periods, bv = data
-    p_err, bv_err = data
-    model_periods = gc_model(params, bv)
-    return sum(-.5*((periods - model_periods)/p_err)**2)
+    model_periods = gc_model(params, bv[0])
+    return sum(-.5*((period[0] - model_periods)/period[1])**2)
+
+
+def iso_lnlike(lnparams):
+    """
+    Some isochronal likelihood function.
+    parameters:
+    ----------
+    params: (array)
+        The array of parameters: mass, age, metallicity, distance, extinction.
+    bands: (dict)
+        The dictionary of Kepler j, h, k with their uncertainties.
+    parallax: (tuple)
+        The parallax and its uncertainty.
+    """
+    params = np.array([np.exp(lnparams[0]), np.log10(1e9*np.exp(lnparams[1])),
+                      lnparams[2], np.exp(lnparams[3]), lnparams[4]])
+    return mod.lnlike(params)
 
 
 def lnprior(params):
@@ -60,29 +76,6 @@ def lnprior(params):
         return 0.
     else:
         return -np.inf
-
-
-def iso_lnlike(params, bands, parallax, fit_parallax=True):
-    """
-    Some isochronal likelihood function.
-    parameters:
-    ----------
-    params: (array)
-        The array of parameters: mass, age, metallicity, distance, extinction.
-    bands: (dict)
-        The dictionary of Kepler j, h, k with their uncertainties.
-    parallax: (tuple)
-        The parallax and its uncertainty.
-    """
-
-    bands = data
-    if fit_parallax:
-        args = dict(bands, parallax=(parallax))
-    else:
-        args = bands
-    mod = StarModel(mist, **args)
-    print(mod.lnlike(params))
-    return mod.lnlike(params)
 
 
 def lnprob(params, *args, fit_parallax=True, gyro=True,
@@ -122,23 +115,33 @@ if __name__ == "__main__":
     mass, feh, d, Av = 1., 0., 10., 0.
     params = np.log(np.array([a, b, n, age, mass, feh, d, Av]))
 
-    # test on the Sun first.
-    MJ = 3.711  # absolute magnitudes
-    MH = 3.453
-    MK = 3.357
-    J = distance_modulus(MJ, 10)
-    H = distance_modulus(MH, 10)
-    K = distance_modulus(MK, 10)
+    _1s = np.ones(10)  # make fake data arrays, length 10.
 
-    bands = dict(J=(J, .01), H=(H, .01), K=(K, .01),)
-    parallax = (.1, .001)
-    period = (26., 1.)
-    bv = (.65, .01)
+    # test on the Sun at 10 pc first.
+    J, J_err = _1s*3.711, _1s*.01  # absolute magnitudes/apparent at D = 10pc
+    H, H_err = _1s*3.453, _1s*.01
+    K, K_err = _1s*3.357, _1s*.01
+
+    bands = dict(J=(J, J_err), H=(H, H_err), K=(K, K_err),)
+    parallax = (_1s*.1, _1s*.001)
+    period = (_1s*26., _1s*1.)
+    bv = (_1s*.65, _1s*.01)
     args = (bands, parallax, period, bv)
 
     # test the gyro model
     gyro_params = np.log(np.array([a, b, n, 4.56]))
-    print(gc_model(gyro_params, bv))
+    # print(gc_model(gyro_params, bv[0]))
+
+    # test the gyro lhf
+    # print(gc_lnlike(gyro_params, period, bv))
+
+    # test the iso_lnlike
+    mist = MIST_Isochrone()
+    iso_params = np.array([np.log(mass), np.log(age), feh, np.log(d), Av])
+
+    mod = StarModel(mist, J=(J, J_err), H=(H, H_err), K=(K, K_err),
+                    parallax=(.1, .001))
+    print(iso_lnlike(iso_params))
 
 
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
