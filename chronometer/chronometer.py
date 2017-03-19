@@ -43,7 +43,7 @@ def gc_lnlike(params, period, bv):
     bv: (tuple)
         The B-V colour and colour uncertainty.
     """
-    model_periods = gc_model(params, bv[0])
+    model_periods = gc_model(params[:4], bv[0])
     return -.5*((period[0] - model_periods)/period[1])**2
 
 
@@ -58,8 +58,9 @@ def iso_lnlike(lnparams, mod):
     mod: (object)
         An isochrones.py starmodel object.
     """
-    params = np.array([np.exp(lnparams[0]), np.log10(1e9*np.exp(lnparams[1])),
-                      lnparams[2], np.exp(lnparams[3]), lnparams[4]])
+    a, b, n, lnage, lnmass, feh, lnd, Av = lnparams
+    params = np.array([np.exp(lnmass), np.log10(1e9*np.exp(lnage)), feh,
+                       np.exp(lnd), Av])
     return mod.lnlike(params)
 
 
@@ -69,7 +70,7 @@ def lnprior(params):
     a, b, n, age, mass, feh, distance, Av = params
     """
     if -10 < params[0] < 10 and -10 < params[1] < 10 and \
-            -10 < params[2] < 10 and -10 < params[3] < 10 and \
+            -10 < params[2] < 10 and -10 < params[3] < 11 and \
             -10 < params[4] < 10 and -10 < params[5] < 10 and \
             -10 < params[6] < 10 and -10 < params[7] < 10:
         return 0.
@@ -77,7 +78,7 @@ def lnprior(params):
         return -np.inf
 
 
-def lnprob(params, mod, period, bv, gyro=True, iso=False):
+def lnprob(params, mod, period, bv, gyro=False, iso=True):
     """
     The joint log-probability of age given gyro and iso parameters.
     mod: (list)
@@ -87,21 +88,28 @@ def lnprob(params, mod, period, bv, gyro=True, iso=False):
     iso: (bool)
         If True, the iso likelihood will be used.
     """
-    a, b, n, age, mass, feh, d, Av = params
-    iso_params = np.array([mass, age, feh, d, Av])
-    gyro_params = np.array([a, b, n, age])
 
     if gyro and iso:
-        return iso_lnlike(iso_params, mod) + gc_lnlike(gyro_params, period,
-                                                       bv) + lnprior(params)
+        return iso_lnlike(params, mod) + gc_lnlike(params, period, bv) + \
+            lnprior(params)
     elif gyro:
-        return gc_lnlike(gyro_params, period, bv) + lnprior(params)
+        return gc_lnlike(params, period, bv) + lnprior(params)
     elif iso:
-        return iso_lnlike(iso_params, mod) + lnprior(params)
+        return iso_lnlike(params, mod) + lnprior(params)
 
 
-def distance_modulus(M, D):
-    return 5*np.log10(D) - 5 + M
+def probtest(xs, i):
+    lps = []
+    p = params + 0
+    for x in xs:
+        p[i] = x
+        lp = lnprob(p, mod, period, bv, gyro=False, iso=True)
+        lps.append(lp)
+    plt.clf()
+    plt.plot(xs, lps)
+    plt.xlabel("X")
+    plt.ylabel("lnprob")
+    plt.savefig("probs_{}".format(i))
 
 
 if __name__ == "__main__":
@@ -128,7 +136,6 @@ if __name__ == "__main__":
     print(gc_model(gyro_params, bv[0]))
 
     # test the gyro lhf
-    print(gyro_params, period, bv, "1")
     print("gyro_lnlike = ", gc_lnlike(gyro_params, period, bv))
 
     # test the iso_lnlike
@@ -139,8 +146,7 @@ if __name__ == "__main__":
     start = time.time()
     mod = StarModel(mist, J=(J, J_err), H=(H, H_err), K=(K, K_err),
                     parallax=(.1, .001))
-    p0 = np.array([np.exp(params[0]), np.log10(1e9*np.exp(params[1])),
-                      params[2], np.exp(params[3]), params[4]])
+    p0 = np.array([params[0], params[1], params[2], params[3], params[4]])
 
     start = time.time()
     mod.lnlike(p0)
@@ -148,12 +154,23 @@ if __name__ == "__main__":
     print("preamble time = ", end - start)
 
     start = time.time()
-    print("iso_lnlike = ", iso_lnlike(iso_params, mod))
+    print("iso_lnlike = ", iso_lnlike(params, mod))
     end = time.time()
     print("lhf time = ", end - start)
 
     # test the lnprob.
-    print("lnprob = ", lnprob(params, mod, period, bv, gyro=True, iso=False))
+    print("lnprob = ", lnprob(params, mod, period, bv, gyro=False, iso=True))
+
+    ages = np.log(np.arange(1., 10., 1))
+    masses = np.log(np.arange(.1, 2., .1))
+    fehs = np.arange(-.1, .1, .01)
+    ds = np.log(np.arange(8, 20, 1))
+    Avs = np.arange(.1, .5, .01)
+    probtest(ages, 3)
+    probtest(masses, 4)
+    probtest(fehs, 5)
+    probtest(ds, 6)
+    probtest(Avs, 7)
 
     nwalkers, nsteps, ndim = 64, 10000, len(params)
     p0 = [1e-4*np.random.rand(ndim) + params for i in range(nwalkers)]
@@ -166,7 +183,9 @@ if __name__ == "__main__":
     print("production run...")
     sampler.run_mcmc(pos, nsteps)
     flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
-    fig = corner.corner(flat)
+    labels = ["$a$", "$b$", "$n$", "$\ln(Age)$", "$\ln(Mass)$", "$[Fe/H]$",
+              "$\ln(D)$", "$A_v$"]
+    fig = corner.corner(flat, labels=labels)
     fig.savefig("corner_test")
 
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
