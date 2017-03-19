@@ -145,7 +145,7 @@ if __name__ == "__main__":
     # iso_lnlike preamble.
     start = time.time()
     mod = StarModel(mist, J=(J, J_err), H=(H, H_err), K=(K, K_err),
-                    parallax=(.1, .001))
+                    parallax=(.1, .001), Teff=(5700, 50), logg=(4.44, .1))
     p0 = np.array([params[0], params[1], params[2], params[3], params[4]])
 
     start = time.time()
@@ -178,7 +178,7 @@ if __name__ == "__main__":
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob,
                                     args=[mod, period, bv])
     print("burning in...")
-    pos, _, _ = sampler.run_mcmc(p0, 1000)
+    pos, _, _ = sampler.run_mcmc(p0, 10)
     sampler.reset()
     print("production run...")
     sampler.run_mcmc(pos, nsteps)
@@ -187,3 +187,9 @@ if __name__ == "__main__":
               "$\ln(D)$", "$A_v$"]
     fig = corner.corner(flat, labels=labels)
     fig.savefig("corner_test")
+
+    for i in range(ndim):
+        plt.clf()
+        plt.plot(flat[:, i], alpha=.5)
+        plt.ylabel(labels[i])
+        plt.savefig("{}_trace".format(i))

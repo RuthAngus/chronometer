@@ -53,9 +53,10 @@ def lnprob(params, mod):
 
 def probtest(xs, i):
     lps = []
+    p = params + 0
     for x in xs:
-        params[i] = x
-        lp = lnprob(params, mod)
+        p[i] = x
+        lp = lnprob(p, mod)
         lps.append(lp)
     plt.clf()
     plt.plot(xs, lps)
@@ -115,12 +116,12 @@ if __name__ == "__main__":
     # assert 0
 
     # Run MCMC
-    nwalkers, nsteps, ndim = 64, 10000, len(params)
+    nwalkers, nsteps, ndim = 64, 1000, len(params)
     p0 = [1e-4*np.random.rand(ndim) + params for i in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=[mod])
 
     print("burning in...")
-    pos, _, _ = sampler.run_mcmc(p0, 1000)
+    pos, _, _ = sampler.run_mcmc(p0, 10)
     sampler.reset()
 
     print("production run...")
@@ -129,3 +130,10 @@ if __name__ == "__main__":
     labels = ["$Age$", "$Mass$", "$[Fe/H]$", "$D$", "$A_v$"]
     fig = corner.corner(flat)
     fig.savefig("corner_iso")
+
+    print(np.shape(flat))
+    for i in range(ndim):
+        plt.clf()
+        plt.plot(flat[:, i], "k", alpha=.5)
+        plt.ylabel(labels[i])
+        plt.savefig("{}_trace".format(i))
