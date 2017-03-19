@@ -14,6 +14,7 @@ from isochrones.mist import MIST_Isochrone
 from simple_gibbs import gibbs
 import emcee
 import corner
+import priors
 
 
 def gc_model(params, bv):
@@ -65,15 +66,13 @@ def iso_lnlike(lnparams, mod):
 
 
 def lnprior(params):
-    """
-    Some simple, uninformative prior over the parameters.
-    a, b, n, age, mass, feh, distance, Av = params
-    """
+    age_prior = np.log(priors.age_prior(np.log10(1e9*np.exp(params[3]))))
+    feh_prior = np.log(priors.feh_prior(params[5]))
+    distance_prior = np.log(priors.distance_prior(np.exp(params[6])))
+    Av_prior = np.log(priors.AV_prior(params[7]))
     if -10 < params[0] < 10 and -10 < params[1] < 10 and \
-            -10 < params[2] < 10 and -10 < params[3] < 11 and \
-            -10 < params[4] < 10 and -10 < params[5] < 10 and \
-            -10 < params[6] < 10 and -10 < params[7] < 10:
-        return 0.
+            -10 < params[2] < 10:
+        return age_prior + feh_prior + distance_prior + Av_prior
     else:
         return -np.inf
 
@@ -178,7 +177,7 @@ if __name__ == "__main__":
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob,
                                     args=[mod, period, bv])
     print("burning in...")
-    pos, _, _ = sampler.run_mcmc(p0, 10)
+    pos, _, _ = sampler.run_mcmc(p0, 1000)
     sampler.reset()
     print("production run...")
     sampler.run_mcmc(pos, nsteps)
@@ -188,8 +187,13 @@ if __name__ == "__main__":
     fig = corner.corner(flat, labels=labels)
     fig.savefig("corner_test")
 
+    plt.clf()
+    print(np.shape(sampler.lnprobability.T))
+    plt.plot(sampler.lnprobability.T, "k")
+    plt.savefig("prob_trace")
+
     for i in range(ndim):
         plt.clf()
-        plt.plot(flat[:, i], alpha=.5)
+        plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
         plt.ylabel(labels[i])
         plt.savefig("{}_trace".format(i))
