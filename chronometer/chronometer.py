@@ -187,13 +187,3 @@ if __name__ == "__main__":
               "$\ln(D)$", "$A_v$"]
     fig = corner.corner(flat, labels=labels)
     fig.savefig("corner_test")
-
-    DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
-    # load data.
-    cs = pd.read_csv(os.path.join(DATA_DIR, "clusters.csv"))
-    m = (.6 < cs.bv.values) * (cs.bv.values < .7)
-    cs = cs.iloc[m]
-    periods = cs.period.values
-    bvs = cs.bv.values
-    ages = cs.age.values * 1e3
-    age_err = cs.age_err.values
