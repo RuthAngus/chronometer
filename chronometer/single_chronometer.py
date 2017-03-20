@@ -119,6 +119,7 @@ if __name__ == "__main__":
     params = np.array([a, b, n, np.log(age), np.log(mass), feh, np.log(d),
                        Av])
 
+
     # test on the Sun at 10 pc first.
     J, J_err = 3.711, .01  # absolute magnitudes/apparent at D = 10pc
     H, H_err = 3.453, .01
