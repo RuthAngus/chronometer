@@ -77,7 +77,7 @@ def lnprior(params):
         return -np.inf
 
 
-def lnprob(params, mod, period, bv, gyro=False, iso=True):
+def lnprob(params, mod, period, bv, gyro=True, iso=True):
     """
     The joint log-probability of age given gyro and iso parameters.
     mod: (list)
@@ -144,7 +144,7 @@ if __name__ == "__main__":
     # iso_lnlike preamble.
     start = time.time()
     mod = StarModel(mist, J=(J, J_err), H=(H, H_err), K=(K, K_err),
-                    parallax=(.1, .001), Teff=(5700, 50), logg=(4.44, .1))
+                    parallax=(.1, .001))
     p0 = np.array([params[0], params[1], params[2], params[3], params[4]])
 
     start = time.time()
@@ -158,7 +158,7 @@ if __name__ == "__main__":
     print("lhf time = ", end - start)
 
     # test the lnprob.
-    print("lnprob = ", lnprob(params, mod, period, bv, gyro=False, iso=True))
+    print("lnprob = ", lnprob(params, mod, period, bv, gyro=True, iso=True))
 
     ages = np.log(np.arange(1., 10., 1))
     masses = np.log(np.arange(.1, 2., .1))
@@ -182,9 +182,11 @@ if __name__ == "__main__":
     print("production run...")
     sampler.run_mcmc(pos, nsteps)
     flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
+    truths = [.7725, .601, .5189, np.log(4.56), np.log(1), 0., np.log(10),
+              0.]
     labels = ["$a$", "$b$", "$n$", "$\ln(Age)$", "$\ln(Mass)$", "$[Fe/H]$",
               "$\ln(D)$", "$A_v$"]
-    fig = corner.corner(flat, labels=labels)
+    fig = corner.corner(flat, labels=labels, truths=truths)
     fig.savefig("corner_test")
 
     plt.clf()
