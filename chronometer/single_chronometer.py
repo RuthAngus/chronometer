@@ -108,10 +108,12 @@ def probtest(xs, i):
     plt.plot(xs, lps)
     plt.xlabel("X")
     plt.ylabel("lnprob")
-    plt.savefig("probs_{}".format(i))
+    plt.savefig(os.path.join(FIG_DIR, "probs_{}".format(i)))
 
 
 if __name__ == "__main__":
+
+    FIG_DIR = "/Users/ruthangus/projects/chronometer/chronometer/figures"
 
     a, b, n = .7725, .601, .5189
     age = 4.56
@@ -160,6 +162,7 @@ if __name__ == "__main__":
     # test the lnprob.
     print("lnprob = ", lnprob(params, mod, period, bv, gyro=True, iso=True))
 
+    # Plot profile likelihoods
     ages = np.log(np.arange(1., 10., 1))
     masses = np.log(np.arange(.1, 2., .1))
     fehs = np.arange(-.1, .1, .01)
@@ -171,13 +174,16 @@ if __name__ == "__main__":
     probtest(ds, 6)
     probtest(Avs, 7)
 
-    nwalkers, nsteps, ndim = 64, 10000, len(params)
+    start = time.time()
+
+    # Run emcee
+    nwalkers, nsteps, ndim = 64, 50000, len(params)
     p0 = [1e-4*np.random.rand(ndim) + params for i in range(nwalkers)]
 
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob,
                                     args=[mod, period, bv])
     print("burning in...")
-    pos, _, _ = sampler.run_mcmc(p0, 1000)
+    pos, _, _ = sampler.run_mcmc(p0, 2000)
     sampler.reset()
     print("production run...")
     sampler.run_mcmc(pos, nsteps)
@@ -187,15 +193,19 @@ if __name__ == "__main__":
     labels = ["$a$", "$b$", "$n$", "$\ln(Age)$", "$\ln(Mass)$", "$[Fe/H]$",
               "$\ln(D)$", "$A_v$"]
     fig = corner.corner(flat, labels=labels, truths=truths)
-    fig.savefig("corner_test")
+    fig.savefig(os.path.join(FIG_DIR, "corner_single"))
 
+    end = time.time()
+    print("time taken = ", (end - start)/60., "minutes")
+
+    # Plot probability trace.
     plt.clf()
-    print(np.shape(sampler.lnprobability.T))
     plt.plot(sampler.lnprobability.T, "k")
-    plt.savefig("prob_trace")
+    plt.savefig(os.path.join(FIG_DIR, "prob_trace_single"))
 
+    # Plot individual parameter traces.
     for i in range(ndim):
         plt.clf()
         plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
         plt.ylabel(labels[i])
-        plt.savefig("{}_trace".format(i))
+        plt.savefig(os.path.join(FIG_DIR, "{}_trace_single".format(i)))
