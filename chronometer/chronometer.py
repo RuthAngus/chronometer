@@ -28,7 +28,9 @@ def gc_model(params, ln_age, bv):
     data: (array)
         A an array containing colour.
     """
-    a, b, n = params
+    # a, b, n = params
+    a, b, n = [.7725, .601, .5189]
+    # ln_age = np.log(np.array([4.56, .5]))
     return a*(np.exp(ln_age)*1e3)**n * (bv - .4)**b
 
 
@@ -74,10 +76,18 @@ def iso_lnlike(lnparams, mods):
 
 
 def lnprior(params):
-    age_prior = np.log(priors.age_prior(np.log10(1e9*np.exp(params[3]))))
-    feh_prior = np.log(priors.feh_prior(params[5]))
-    distance_prior = np.log(priors.distance_prior(np.exp(params[6])))
-    Av_prior = np.log(priors.AV_prior(params[7]))
+    N = int(len(params[3:])/5)  # number of stars
+    ln_age = params[3+N:3+2*N]  # parameter assignment
+    ln_mass = params[3+2*N:3+3*N]
+    feh = params[3+3*N:3+4*N]
+    d = params[3+4*N:3+5*N]
+    Av = params[3+5*N:3+6*N]
+    age_prior = sum([np.log(priors.age_prior(np.log10(1e9*np.exp(i))))
+                     for i in ln_age])
+    feh_prior = sum([np.log(priors.feh_prior(i)) for i in feh])
+    distance_prior = sum([np.log(priors.distance_prior(np.exp(i))) for i
+                          in d])
+    Av_prior = sum([np.log(priors.AV_prior(Av[i])) for i in Av])
     if -10 < params[0] < 10 and -10 < params[1] < 10 and \
             -10 < params[2] < 10:
         return age_prior + feh_prior + distance_prior + Av_prior
@@ -197,14 +207,14 @@ if __name__ == "__main__":
     fig = corner.corner(flat, labels=labels, truths=truths)
     fig.savefig("corner_test")
 
-    # Plot probability
-    plt.clf()
-    plt.plot(sampler.lnprobability.T, "k")
-    plt.savefig("prob_trace")
+    # # Plot probability
+    # plt.clf()
+    # plt.plot(sampler.lnprobability.T, "k")
+    # plt.savefig("prob_trace")
 
-    # Plot chains
-    for i in range(ndim):
-        plt.clf()
-        plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
-        plt.ylabel(labels[i])
-        plt.savefig("{}_trace".format(i))
+    # # Plot chains
+    # for i in range(ndim):
+    #     plt.clf()
+    #     plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
+    #     plt.ylabel(labels[i])
+    #     plt.savefig("{}_trace".format(i))

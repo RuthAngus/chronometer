@@ -1,6 +1,6 @@
 import numpy as np
 
-def age_prior(age, bounds=(9,10.15)):
+def age_prior(age, bounds=(8,10.15)):
     """
     Uniform true age prior; where 'age' is actually log(age)
     """
