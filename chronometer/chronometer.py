@@ -85,8 +85,7 @@ def lnprior(params):
         return -np.inf
 
 
-def lnprob(params, mods, period, bv, gyro=True, iso=False, fixpar=None,
-           fixstar=None):
+def lnprob(params, mods, period, bv, gyro=True, iso=False):
     """
     The joint log-probability of age given gyro and iso parameters.
     mod: (list)
@@ -95,12 +94,6 @@ def lnprob(params, mods, period, bv, gyro=True, iso=False, fixpar=None,
         If True, the gyro likelihood will be used.
     iso: (bool)
         If True, the iso likelihood will be used.
-    fixpar: (int or array)
-        If int, this is the index of the parameter to fix. If list, this is an
-        array or mask of fixed indices.
-    fixstar: (int or array)
-        If int, this is the index of the star who's parameters should remain
-        fixed. If list it's the indices or mask for the group of stars to fix.
     """
     if gyro and iso:
         return iso_lnlike(params, mods) + gc_lnlike(params, period, bv) + \
