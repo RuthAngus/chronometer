@@ -17,7 +17,7 @@ import corner
 import priors
 
 
-def gc_model(params, bv):
+def gc_model(params, ln_age, bv):
     """
     Given a B-V colour and an age predict a rotation period.
     Returns log(age) in Myr.
@@ -28,7 +28,7 @@ def gc_model(params, bv):
     data: (array)
         A an array containing colour.
     """
-    a, b, n, ln_age = params
+    a, b, n = params
     return a*(np.exp(ln_age)*1e3)**n * (bv - .4)**b
 
 
@@ -44,11 +44,13 @@ def gc_lnlike(params, period, bv):
     bv: (tuple)
         The B-V colour and colour uncertainty.
     """
-    model_periods = gc_model(params[:4], bv[0])
-    return -.5*((period[0] - model_periods)/period[1])**2
+    N = int(len(params[3:])/5)  # number of stars
+    ln_age = params[3+N:3+2*N]  # parameter assignment
+    model_periods = gc_model(params[:3], ln_age, bv[0])
+    return sum(-.5*((period[0] - model_periods)/period[1])**2)
 
 
-def iso_lnlike(lnparams, mod):
+def iso_lnlike(lnparams, mods):
     """
     Some isochronal likelihood function.
     parameters:
@@ -59,10 +61,16 @@ def iso_lnlike(lnparams, mod):
     mod: (object)
         An isochrones.py starmodel object.
     """
-    a, b, n, lnage, lnmass, feh, lnd, Av = lnparams
-    params = np.array([np.exp(lnmass), np.log10(1e9*np.exp(lnage)), feh,
-                       np.exp(lnd), Av])
-    return mod.lnlike(params)
+    p = lnparams[3:]*1
+    N = int(len(p)/5)
+
+    # Transform to linear space
+    p[:N] = np.exp(p[:N])
+    p[N:2*N] = np.log10(1e9*np.exp(p[N:2*N]))
+    p[3*N:4*N] = np.exp(p[3*N:4*N])
+
+    ll = [mods[i].lnlike(p[i::N]) for i in range(len((mods)))]
+    return sum(ll)
 
 
 def lnprior(params):
@@ -77,7 +85,8 @@ def lnprior(params):
         return -np.inf
 
 
-def lnprob(params, mod, period, bv, gyro=True, iso=True):
+def lnprob(params, mods, period, bv, gyro=True, iso=False, fixpar=None,
+           fixstar=None):
     """
     The joint log-probability of age given gyro and iso parameters.
     mod: (list)
@@ -86,113 +95,121 @@ def lnprob(params, mod, period, bv, gyro=True, iso=True):
         If True, the gyro likelihood will be used.
     iso: (bool)
         If True, the iso likelihood will be used.
+    fixpar: (int or array)
+        If int, this is the index of the parameter to fix. If list, this is an
+        array or mask of fixed indices.
+    fixstar: (int or array)
+        If int, this is the index of the star who's parameters should remain
+        fixed. If list it's the indices or mask for the group of stars to fix.
     """
-
     if gyro and iso:
-        return iso_lnlike(params, mod) + gc_lnlike(params, period, bv) + \
+        return iso_lnlike(params, mods) + gc_lnlike(params, period, bv) + \
             lnprior(params)
     elif gyro:
         return gc_lnlike(params, period, bv) + lnprior(params)
     elif iso:
-        return iso_lnlike(params, mod) + lnprior(params)
-
-
-def probtest(xs, i):
-    lps = []
-    p = params + 0
-    for x in xs:
-        p[i] = x
-        lp = lnprob(p, mod, period, bv, gyro=False, iso=True)
-        lps.append(lp)
-    plt.clf()
-    plt.plot(xs, lps)
-    plt.xlabel("X")
-    plt.ylabel("lnprob")
-    plt.savefig("probs_{}".format(i))
+        return iso_lnlike(params, mods) + lnprior(params)
 
 
 if __name__ == "__main__":
 
-    a, b, n = .7725, .601, .5189
-    age = 4.56
-    mass, feh, d, Av = 1., 0., 10., 0.
-    params = np.array([a, b, n, np.log(age), np.log(mass), feh, np.log(d),
-                       Av])
+    # The parameters
+    gc = np.array([.7725, .601, .5189])
+    ages = np.array([4.56, .5])
+    masses = np.array([1., 1.])
+    fehs = np.array([0., 0.])
+    ds = np.array([10., 10.])
+    Avs = np.array([0., 0.])
+    p0 = np.concatenate((gc, np.log(masses), np.log(ages), fehs, np.log(ds),
+                         Avs))
 
     # test on the Sun at 10 pc first.
     J, J_err = 3.711, .01  # absolute magnitudes/apparent at D = 10pc
     H, H_err = 3.453, .01
     K, K_err = 3.357, .01
 
-    bands = dict(J=(J, J_err), H=(H, H_err), K=(K, K_err),)
-    parallax = (.1, .001)
-    period = (26., 1.)
-    bv = (.65, .01)
+    # The data
+    Js = np.array([J, J])
+    J_errs = np.array([J_err, J_err])
+    Hs = np.array([H, H])
+    H_errs = np.array([H_err, H_err])
+    Ks = np.array([K, K])
+    K_errs = np.array([K_err, K_err])
+    parallaxes = np.array([.1, .1])
+    parallax_errs = np.array([.001, .001])
+    periods = np.array([26., 8.3])
+    period_errs = np.array([.1, .1])
+    bvs = np.array([.65, .65])
+    bv_errs = np.array([.01, .01])
 
-    # test the gyro model
-    gyro_params = np.array([a, b, n, np.log(4.56)])
-    print(gc_model(gyro_params, bv[0]))
+    # Plot the data
+    # xs = np.linspace(.1, 6, 100)
+    # ps = gc_model(p0[:3], np.log(xs), p0[3], bvs[0])
+    # plt.clf()
+    # plt.plot(ages, periods, "k.")
+    # plt.plot(xs, ps)
+    # plt.xlabel("Age (Gyr)")
+    # plt.ylabel("Period (days)")
+    # plt.savefig("period_age_data")
 
     # test the gyro lhf
-    print("gyro_lnlike = ", gc_lnlike(gyro_params, period, bv))
+    print("gyro_lnlike = ", gc_lnlike(p0, periods, bvs))
 
     # test the iso_lnlike
     mist = MIST_Isochrone()
-    iso_params = np.array([np.log(mass), np.log(age), feh, np.log(d), Av])
 
     # iso_lnlike preamble.
     start = time.time()
-    mod = StarModel(mist, J=(J, J_err), H=(H, H_err), K=(K, K_err),
-                    parallax=(.1, .001))
-    p0 = np.array([params[0], params[1], params[2], params[3], params[4]])
+    mods = []
+    for i in range(len(periods)):
+        mods.append(StarModel(mist, J=(Js[i], J_errs[i]),
+                              H=(Hs[i], H_errs[i]), K=(Ks[i], K_errs[i]),
+                              parallax=(parallaxes[i], parallax_errs[i])))
 
+        start = time.time()
+        mods[i].lnlike(p0)
+        end = time.time()
+        print("preamble time = ", end - start)
+
+        start = time.time()
+        print("iso_lnlike = ", iso_lnlike(p0, mods))
+        end = time.time()
+        print("lhf time = ", end - start)
+
+        # test the lnprob.
+        print("lnprob = ", lnprob(p0, mods, periods, bvs, gyro=True,
+                                  iso=False))
     start = time.time()
-    mod.lnlike(p0)
-    end = time.time()
-    print("preamble time = ", end - start)
 
-    start = time.time()
-    print("iso_lnlike = ", iso_lnlike(params, mod))
-    end = time.time()
-    print("lhf time = ", end - start)
-
-    # test the lnprob.
-    print("lnprob = ", lnprob(params, mod, period, bv, gyro=True, iso=True))
-
-    ages = np.log(np.arange(1., 10., 1))
-    masses = np.log(np.arange(.1, 2., .1))
-    fehs = np.arange(-.1, .1, .01)
-    ds = np.log(np.arange(8, 20, 1))
-    Avs = np.arange(.1, .5, .01)
-    probtest(ages, 3)
-    probtest(masses, 4)
-    probtest(fehs, 5)
-    probtest(ds, 6)
-    probtest(Avs, 7)
-
-    nwalkers, nsteps, ndim = 64, 10000, len(params)
-    p0 = [1e-4*np.random.rand(ndim) + params for i in range(nwalkers)]
-
+    # Run emcee and plot corner
+    nwalkers, nsteps, ndim = 64, 10000, len(p0)
+    p0 = [1e-4*np.random.rand(ndim) + p0 for i in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob,
-                                    args=[mod, period, bv])
+                                    args=[mods, periods, bvs])
     print("burning in...")
-    pos, _, _ = sampler.run_mcmc(p0, 1000)
+    pos, _, _ = sampler.run_mcmc(p0, 2000)
     sampler.reset()
     print("production run...")
     sampler.run_mcmc(pos, nsteps)
+
+    end = time.time()
+    print("Time taken = ", (end - start)/60., "mins")
+
     flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
-    truths = [.7725, .601, .5189, np.log(4.56), np.log(1), 0., np.log(10),
-              0.]
-    labels = ["$a$", "$b$", "$n$", "$\ln(Age)$", "$\ln(Mass)$", "$[Fe/H]$",
-              "$\ln(D)$", "$A_v$"]
+    truths = [.7725, .601, .5189, np.log(4.56), np.log(.5), np.log(1),
+              np.log(1), 0., 0., np.log(10), np.log(10), 0., 0.]
+    labels = ["$a$", "$b$", "$n$", "$\ln(Age_1)$", "$\ln(Age_2)$",
+              "$\ln(Mass_1)$", "$\ln(Mass_2)$", "$[Fe/H]_1$", "$[Fe/H]_2$",
+              "$\ln(D_1)$", "$\ln(D_2)$", "$A_v1$", "$A_v2$"]
     fig = corner.corner(flat, labels=labels, truths=truths)
     fig.savefig("corner_test")
 
+    # Plot probability
     plt.clf()
-    print(np.shape(sampler.lnprobability.T))
     plt.plot(sampler.lnprobability.T, "k")
     plt.savefig("prob_trace")
 
+    # Plot chains
     for i in range(ndim):
         plt.clf()
         plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
