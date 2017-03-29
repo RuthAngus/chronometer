@@ -77,7 +77,7 @@ def lnprior(params):
         return -np.inf
 
 
-def lnprob(params, mod, period, bv, gyro=False, iso=True):
+def lnprob(params, mod, period, bv, gyro=True, iso=True):
     """
     The joint log-probability of age given gyro and iso parameters.
     mod: (list)
@@ -102,7 +102,7 @@ def probtest(xs, i):
     p = params + 0
     for x in xs:
         p[i] = x
-        lp = lnprob(p, mod, period, bv, gyro=False, iso=True)
+        lp = lnprob(p, mod, period, bv, gyro=True, iso=True)
         lps.append(lp)
     plt.clf()
     plt.plot(xs, lps)
@@ -147,7 +147,7 @@ if __name__ == "__main__":
     K, K_err = 3.357, .01
 
     bands = dict(J=(J, J_err), H=(H, H_err), K=(K, K_err),)
-    parallax = (1./d, .01)
+    parallax = (1./d*1e3, .01)
     period = (26., 1.)
     bv = (.65, .01)
 
@@ -165,12 +165,7 @@ if __name__ == "__main__":
     # iso_lnlike preamble.
     start = time.time()
     mod = StarModel(mist, J=(J, J_err), H=(H, H_err), K=(K, K_err),
-                    Teff=(5700, 50), logg=(4.5, .1), feh=(0., .01),
-                    use_emcee=True)
-                    # parallax=(1./d, .1), use_emcee=True)
-    #                 # parallax=(1./d, .001), use_emcee=True)
-    # mod = StarModel(mist, Teff=(5700, 100), logg=(4.5, 0.1), feh=(0.0, 0.1),
-                    # use_emcee=True)
+                    parallax=parallax, use_emcee=True)
     p0 = np.array([params[0], params[1], params[2], params[3], params[4]])
 
     start = time.time()
@@ -184,7 +179,7 @@ if __name__ == "__main__":
     print("lhf time = ", end - start)
 
     # test the lnprob.
-    print("lnprob = ", lnprob(params, mod, period, bv, gyro=False, iso=True))
+    print("lnprob = ", lnprob(params, mod, period, bv, gyro=True, iso=True))
 
     # Plot profile likelihoods
     ages = np.log(np.arange(1., 10., 1))
