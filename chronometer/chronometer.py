@@ -28,8 +28,8 @@ def gc_model(params, ln_age, bv):
     data: (array)
         A an array containing colour.
     """
-    # a, b, n = params
-    a, b, n = [.7725, .601, .5189]
+    a, b, n = params
+    # a, b, n = [.7725, .601, .5189]
     # ln_age = np.log(np.array([4.56, .5]))
     return a*(np.exp(ln_age)*1e3)**n * (bv - .4)**b
 
@@ -95,7 +95,7 @@ def lnprior(params):
         return -np.inf
 
 
-def lnprob(params, mods, period, bv, gyro=True, iso=False):
+def lnprob(params, mods, period, bv, gyro=True, iso=True):
     """
     The joint log-probability of age given gyro and iso parameters.
     mod: (list)
@@ -167,7 +167,7 @@ if __name__ == "__main__":
     for i in range(len(periods)):
         mods.append(StarModel(mist, J=(Js[i], J_errs[i]),
                               H=(Hs[i], H_errs[i]), K=(Ks[i], K_errs[i]),
-                              parallax=(parallaxes[i], parallax_errs[i])))
+                              use_emcee=True)
 
         start = time.time()
         mods[i].lnlike(p0)
@@ -181,16 +181,16 @@ if __name__ == "__main__":
 
         # test the lnprob.
         print("lnprob = ", lnprob(p0, mods, periods, bvs, gyro=True,
-                                  iso=False))
+                                  iso=True))
     start = time.time()
 
     # Run emcee and plot corner
-    nwalkers, nsteps, ndim = 64, 10000, len(p0)
+    nwalkers, nsteps, ndim = 64, 30000, len(p0)
     p0 = [1e-4*np.random.rand(ndim) + p0 for i in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob,
                                     args=[mods, periods, bvs])
     print("burning in...")
-    pos, _, _ = sampler.run_mcmc(p0, 2000)
+    pos, _, _ = sampler.run_mcmc(p0, 5000)
     sampler.reset()
     print("production run...")
     sampler.run_mcmc(pos, nsteps)
@@ -212,9 +212,9 @@ if __name__ == "__main__":
     # plt.plot(sampler.lnprobability.T, "k")
     # plt.savefig("prob_trace")
 
-    # # Plot chains
-    # for i in range(ndim):
-    #     plt.clf()
-    #     plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
-    #     plt.ylabel(labels[i])
-    #     plt.savefig("{}_trace".format(i))
+    # Plot chains
+    for i in range(ndim):
+        plt.clf()
+        plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
+        plt.ylabel(labels[i])
+        plt.savefig("{}_trace".format(i))
