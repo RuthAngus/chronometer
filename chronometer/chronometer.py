@@ -15,23 +15,7 @@ from simple_gibbs import gibbs
 import emcee
 import corner
 import priors
-
-
-def gc_model(params, ln_age, bv):
-    """
-    Given a B-V colour and an age predict a rotation period.
-    Returns log(age) in Myr.
-    parameters:
-    ----------
-    params: (array)
-        The array of age and (log) gyro parameters, a, b and n.
-    data: (array)
-        A an array containing colour.
-    """
-    a, b, n = params
-    # a, b, n = [.7725, .601, .5189]
-    # ln_age = np.log(np.array([4.56, .5]))
-    return a*(np.exp(ln_age)*1e3)**n * (bv - .4)**b
+from models import gc_model
 
 
 def gc_lnlike(params, period, bv):
@@ -88,14 +72,14 @@ def lnprior(params):
     distance_prior = sum([np.log(priors.distance_prior(np.exp(i))) for i
                           in d])
     Av_prior = sum([np.log(priors.AV_prior(Av[i])) for i in Av])
-    if -10 < params[0] < 10 and -10 < params[1] < 10 and \
-            -10 < params[2] < 10:
+    m = (-10 < params) * (params < 10)
+    if sum(m) == len(m):
         return age_prior + feh_prior + distance_prior + Av_prior
     else:
         return -np.inf
 
 
-def lnprob(params, mods, period, bv, gyro=True, iso=True):
+def lnprob(params, mods, period, bv, gyro=True, iso=False):
     """
     The joint log-probability of age given gyro and iso parameters.
     mod: (list)
@@ -138,7 +122,7 @@ if __name__ == "__main__":
     H_errs = np.array([H_err, H_err])
     Ks = np.array([K, K])
     K_errs = np.array([K_err, K_err])
-    parallaxes = np.array([.1, .1])
+    parallaxes = np.array([.1*1e3, .1*1e3])
     parallax_errs = np.array([.001, .001])
     periods = np.array([26., 8.3])
     period_errs = np.array([.1, .1])
@@ -167,7 +151,7 @@ if __name__ == "__main__":
     for i in range(len(periods)):
         mods.append(StarModel(mist, J=(Js[i], J_errs[i]),
                               H=(Hs[i], H_errs[i]), K=(Ks[i], K_errs[i]),
-                              use_emcee=True)
+                              use_emcee=True))
 
         start = time.time()
         mods[i].lnlike(p0)
@@ -185,12 +169,12 @@ if __name__ == "__main__":
     start = time.time()
 
     # Run emcee and plot corner
-    nwalkers, nsteps, ndim = 64, 30000, len(p0)
+    nwalkers, nsteps, ndim = 64, 5000, len(p0)
     p0 = [1e-4*np.random.rand(ndim) + p0 for i in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob,
                                     args=[mods, periods, bvs])
     print("burning in...")
-    pos, _, _ = sampler.run_mcmc(p0, 5000)
+    pos, _, _ = sampler.run_mcmc(p0, 1000)
     sampler.reset()
     print("production run...")
     sampler.run_mcmc(pos, nsteps)
@@ -207,10 +191,10 @@ if __name__ == "__main__":
     fig = corner.corner(flat, labels=labels, truths=truths)
     fig.savefig("corner_test")
 
-    # # Plot probability
-    # plt.clf()
-    # plt.plot(sampler.lnprobability.T, "k")
-    # plt.savefig("prob_trace")
+    # Plot probability
+    plt.clf()
+    plt.plot(sampler.lnprobability.T, "k")
+    plt.savefig("prob_trace")
 
     # Plot chains
     for i in range(ndim):
