@@ -1,5 +1,8 @@
-# Assembling likelihood functions for Gyrochronology, isochrones, dynamics
-# and asteroseismology.
+"""
+A version where all the parameters are parsed to the lnprob function.
+Doesn't work very well.
+"""
+
 
 import os
 
