@@ -49,19 +49,20 @@ def iso_lnlike(lnparams, mods):
     N = int(len(p)/5)
 
     print("mods = ", mods)
-    assert 0
     # Transform to linear space
+    # mass, age, feh, distance, Av
     p[:N] = np.exp(p[:N])
     p[N:2*N] = np.log10(1e9*np.exp(p[N:2*N]))
     p[3*N:4*N] = np.exp(p[3*N:4*N])
 
+    print(len(mods), type(mods[0]))
     ll = [mods[i].lnlike(p[i::N]) for i in range(len((mods)))]
     return sum(ll)
 
 
 def gyro_lnprior(params):
-    if -10 < params[0] < 10 and -10 < params[1] < 10 \
-            and -10 < params[2] < 10 and -10 < params[3] < 10:
+    m = (-10 < params) * (params < 10)  # Broad bounds on all params.
+    if sum(m) == len(m):
         return 0.
     else:
         return -np.inf
@@ -142,14 +143,13 @@ def new_lnprob(params, *args):
     iso, gyro = False, True
     if len(args) == 1 and len(params) > 3:
         iso, gyro = True, False
-    print("gyro = ", gyro, "iso = ", iso)
 
     if gyro:
         period, period_errs, bv, bv_errs = args
         return gc_lnlike(params, period, period_errs, bv, bv_errs) + \
             gyro_lnprior(params)
     elif iso:
-        mods = args
+        mods = args[0]
         return iso_lnlike(params, mods) + iso_lnprior(params)
 
 
@@ -200,6 +200,8 @@ if __name__ == "__main__":
     print("gyro_lnlike = ", gc_lnlike(gyro_p0, periods, period_errs, bvs,
                                       bv_errs))
     # test the gyro lnprob
+    print("gyro_lnprob = ", new_lnprob(gyro_p0, periods, period_errs, bvs,
+                                       bv_errs))
 
     # test the iso_lnlike
     mist = MIST_Isochrone()
@@ -225,16 +227,22 @@ if __name__ == "__main__":
 
         # test the lnprob.
         print("lnprob = ", new_lnprob(iso_p0, mods))
-        assert 0
 
     start = time.time()
 
     # Run emcee and plot corner
+    g, i = True, False
+    if g:  # If gyro inference
+        p0 = gyro_p0*1
+        args = [periods, period_errs, bvs, bv_errs]
+    elif i:  # If Iso inference.
+        p0 = iso_p0*1
+        args = mods
+
+    print("p0 = ", p0)
     nwalkers, nsteps, ndim = 64, 10000, len(p0)
     p0 = [1e-4*np.random.rand(ndim) + p0 for i in range(nwalkers)]
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob,
-                                    args=[mods, periods, period_errs, bvs,
-                                          bv_errs])
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, new_lnprob, args=args)
     print("burning in...")
     pos, _, _ = sampler.run_mcmc(p0, 2000)
     sampler.reset()
