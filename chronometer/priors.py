@@ -1,3 +1,7 @@
+"""
+The priors
+"""
+
 import numpy as np
 
 def age_prior(age, bounds=(8,10.15)):
