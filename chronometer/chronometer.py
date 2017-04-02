@@ -18,7 +18,7 @@ import priors
 from models import gc_model
 
 
-def gc_lnlike(params, period, bv):
+def gc_lnlike(params, period, period_errs, bv, bv_errs):
     """
     Probability of age and model parameters given rotation period and colour.
     parameters:
@@ -32,8 +32,8 @@ def gc_lnlike(params, period, bv):
     """
     N = int(len(params[3:])/5)  # number of stars
     ln_age = params[3+N:3+2*N]  # parameter assignment
-    model_periods = gc_model(params[:3], ln_age, bv[0])
-    return sum(-.5*((period[0] - model_periods)/period[1])**2)
+    model_periods = gc_model(params[:3], ln_age, bv)
+    return sum(-.5*((period - model_periods)/period_errs)**2)
 
 
 def iso_lnlike(lnparams, mods):
@@ -72,14 +72,15 @@ def lnprior(params):
     distance_prior = sum([np.log(priors.distance_prior(np.exp(i))) for i
                           in d])
     Av_prior = sum([np.log(priors.AV_prior(Av[i])) for i in Av])
-    m = (-10 < params) * (params < 10)
+    m = (-10 < params) * (params < 10)  # Broad bounds on all params.
     if sum(m) == len(m):
         return age_prior + feh_prior + distance_prior + Av_prior
     else:
         return -np.inf
 
 
-def lnprob(params, mods, period, bv, gyro=True, iso=False):
+def lnprob(params, mods, period, period_errs, bv, bv_errs, gyro=True,
+           iso=False):
     """
     The joint log-probability of age given gyro and iso parameters.
     mod: (list)
@@ -90,10 +91,12 @@ def lnprob(params, mods, period, bv, gyro=True, iso=False):
         If True, the iso likelihood will be used.
     """
     if gyro and iso:
-        return iso_lnlike(params, mods) + gc_lnlike(params, period, bv) + \
-            lnprior(params)
+        return iso_lnlike(params, mods) + gc_lnlike(params, period,
+                                                    period_errs, bv,
+                                                    bv_errs) + lnprior(params)
     elif gyro:
-        return gc_lnlike(params, period, bv) + lnprior(params)
+        return gc_lnlike(params, period, period_errs, bv, bv_errs) + \
+            lnprior(params)
     elif iso:
         return iso_lnlike(params, mods) + lnprior(params)
 
@@ -140,7 +143,7 @@ if __name__ == "__main__":
     # plt.savefig("period_age_data")
 
     # test the gyro lhf
-    print("gyro_lnlike = ", gc_lnlike(p0, periods, bvs))
+    print("gyro_lnlike = ", gc_lnlike(p0, periods, period_errs, bvs, bv_errs))
 
     # test the iso_lnlike
     mist = MIST_Isochrone()
@@ -164,17 +167,26 @@ if __name__ == "__main__":
         print("lhf time = ", end - start)
 
         # test the lnprob.
-        print("lnprob = ", lnprob(p0, mods, periods, bvs, gyro=True,
-                                  iso=True))
+        print("lnprob = ", lnprob(p0, mods, periods, period_errs, bvs,
+                                  bv_errs, gyro=True, iso=True))
+
+        # print("lnprob 1 ", lnprob(p0, mods, periods, period_errs, bvs, bv_errs, gyro=True,
+        #              iso=False))
+        # p0[6] = np.log(2)
+        # print("lnprob 2 ", lnprob(p0, mods, periods, period_errs, bvs, bv_errs, gyro=True,
+        #              iso=False))
+        # assert 0
+
     start = time.time()
 
     # Run emcee and plot corner
-    nwalkers, nsteps, ndim = 64, 5000, len(p0)
+    nwalkers, nsteps, ndim = 64, 10000, len(p0)
     p0 = [1e-4*np.random.rand(ndim) + p0 for i in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob,
-                                    args=[mods, periods, bvs])
+                                    args=[mods, periods, period_errs, bvs,
+                                          bv_errs])
     print("burning in...")
-    pos, _, _ = sampler.run_mcmc(p0, 1000)
+    pos, _, _ = sampler.run_mcmc(p0, 2000)
     sampler.reset()
     print("production run...")
     sampler.run_mcmc(pos, nsteps)
