@@ -108,29 +108,7 @@ def lnprior(params):
         return -np.inf
 
 
-def lnprob(params, mods, period, period_errs, bv, bv_errs, gyro=True,
-           iso=False):
-    """
-    The joint log-probability of age given gyro and iso parameters.
-    mod: (list)
-        list of pre-computed star model objects.
-    gyro: (bool)
-        If True, the gyro likelihood will be used.
-    iso: (bool)
-        If True, the iso likelihood will be used.
-    """
-    if gyro and iso:
-        return iso_lnlike(params, mods) + gc_lnlike(params, period,
-                                                    period_errs, bv,
-                                                    bv_errs) + lnprior(params)
-    elif gyro:
-        return gc_lnlike(params, period, period_errs, bv, bv_errs) + \
-            lnprior(params)
-    elif iso:
-        return iso_lnlike(params, mods) + lnprior(params)
-
-
-def new_lnprob(params, *args):
+def lnprob(params, *args):
     """
     The joint log-probability of age given gyro and iso parameters.
     mod: (list)
@@ -200,8 +178,8 @@ if __name__ == "__main__":
     print("gyro_lnlike = ", gc_lnlike(gyro_p0, periods, period_errs, bvs,
                                       bv_errs))
     # test the gyro lnprob
-    print("gyro_lnprob = ", new_lnprob(gyro_p0, periods, period_errs, bvs,
-                                       bv_errs))
+    print("gyro_lnprob = ", lnprob(gyro_p0, periods, period_errs, bvs,
+                                   bv_errs))
 
     # test the iso_lnlike
     mist = MIST_Isochrone()
@@ -226,7 +204,7 @@ if __name__ == "__main__":
         print("lhf time = ", end - start)
 
         # test the lnprob.
-        print("lnprob = ", new_lnprob(iso_p0, mods))
+        print("lnprob = ", lnprob(iso_p0, mods))
 
     start = time.time()
 
@@ -242,7 +220,7 @@ if __name__ == "__main__":
     print("p0 = ", p0)
     nwalkers, nsteps, ndim = 64, 10000, len(p0)
     p0 = [1e-4*np.random.rand(ndim) + p0 for i in range(nwalkers)]
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, new_lnprob, args=args)
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=args)
     print("burning in...")
     pos, _, _ = sampler.run_mcmc(p0, 2000)
     sampler.reset()
