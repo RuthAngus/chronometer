@@ -167,7 +167,6 @@ if __name__ == "__main__":
         print("lhf time = ", end - start)
 
         # test the lnprob.
-        args = mods
         print("lnprob = ", lnprob(p0, mods, periods, period_errs, bvs,
                                   bv_errs, gyro=True, iso=True))
 

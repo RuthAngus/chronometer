@@ -30,9 +30,7 @@ def gc_lnlike(params, period, period_errs, bv, bv_errs):
     bv: (tuple)
         The B-V colour and colour uncertainty.
     """
-    N = int(len(params[3:])/5)  # number of stars
-    ln_age = params[3+N:3+2*N]  # parameter assignment
-    model_periods = gc_model(params[:3], ln_age, bv)
+    model_periods = gc_model(params[:3], params[3:], bv)
     return sum(-.5*((period - model_periods)/period_errs)**2)
 
 
@@ -47,9 +45,11 @@ def iso_lnlike(lnparams, mods):
     mod: (object)
         An isochrones.py starmodel object.
     """
-    p = lnparams[3:]*1
+    p = lnparams*1
     N = int(len(p)/5)
 
+    print("mods = ", mods)
+    assert 0
     # Transform to linear space
     p[:N] = np.exp(p[:N])
     p[N:2*N] = np.log10(1e9*np.exp(p[N:2*N]))
@@ -57,6 +57,34 @@ def iso_lnlike(lnparams, mods):
 
     ll = [mods[i].lnlike(p[i::N]) for i in range(len((mods)))]
     return sum(ll)
+
+
+def gyro_lnprior(params):
+    if -10 < params[0] < 10 and -10 < params[1] < 10 \
+            and -10 < params[2] < 10 and -10 < params[3] < 10:
+        return 0.
+    else:
+        return -np.inf
+
+
+def iso_lnprior(params):
+    N = int(len(params)/5)  # number of stars
+    ln_age = params[N:2*N]  # parameter assignment
+    ln_mass = params[2*N:3*N]
+    feh = params[3*N:4*N]
+    d = params[4*N:5*N]
+    Av = params[5*N:6*N]
+    age_prior = sum([np.log(priors.age_prior(np.log10(1e9*np.exp(i))))
+                     for i in ln_age])
+    feh_prior = sum([np.log(priors.feh_prior(i)) for i in feh])
+    distance_prior = sum([np.log(priors.distance_prior(np.exp(i))) for i
+                          in d])
+    Av_prior = sum([np.log(priors.AV_prior(Av[i])) for i in Av])
+    m = (-10 < params) * (params < 10)  # Broad bounds on all params.
+    if sum(m) == len(m):
+        return age_prior + feh_prior + distance_prior + Av_prior
+    else:
+        return -np.inf
 
 
 def lnprior(params):
@@ -101,6 +129,30 @@ def lnprob(params, mods, period, period_errs, bv, bv_errs, gyro=True,
         return iso_lnlike(params, mods) + lnprior(params)
 
 
+def new_lnprob(params, *args):
+    """
+    The joint log-probability of age given gyro and iso parameters.
+    mod: (list)
+        list of pre-computed star model objects.
+    gyro: (bool)
+        If True, the gyro likelihood will be used.
+    iso: (bool)
+        If True, the iso likelihood will be used.
+    """
+    iso, gyro = False, True
+    if len(args) == 1 and len(params) > 3:
+        iso, gyro = True, False
+    print("gyro = ", gyro, "iso = ", iso)
+
+    if gyro:
+        period, period_errs, bv, bv_errs = args
+        return gc_lnlike(params, period, period_errs, bv, bv_errs) + \
+            gyro_lnprior(params)
+    elif iso:
+        mods = args
+        return iso_lnlike(params, mods) + iso_lnprior(params)
+
+
 if __name__ == "__main__":
 
     # The parameters
@@ -143,10 +195,15 @@ if __name__ == "__main__":
     # plt.savefig("period_age_data")
 
     # test the gyro lhf
-    print("gyro_lnlike = ", gc_lnlike(p0, periods, period_errs, bvs, bv_errs))
+    gyro_p0 = np.concatenate((p0[:3], p0[5:7]))
+    print(gyro_p0)
+    print("gyro_lnlike = ", gc_lnlike(gyro_p0, periods, period_errs, bvs,
+                                      bv_errs))
+    # test the gyro lnprob
 
     # test the iso_lnlike
     mist = MIST_Isochrone()
+    iso_p0 = p0[3:]
 
     # iso_lnlike preamble.
     start = time.time()
@@ -157,25 +214,18 @@ if __name__ == "__main__":
                               use_emcee=True))
 
         start = time.time()
-        mods[i].lnlike(p0)
+        mods[i].lnlike(iso_p0)
         end = time.time()
         print("preamble time = ", end - start)
 
         start = time.time()
-        print("iso_lnlike = ", iso_lnlike(p0, mods))
+        print("iso_lnlike = ", iso_lnlike(iso_p0, mods))
         end = time.time()
         print("lhf time = ", end - start)
 
         # test the lnprob.
-        print("lnprob = ", lnprob(p0, mods, periods, period_errs, bvs,
-                                  bv_errs, gyro=True, iso=True))
-
-        # print("lnprob 1 ", lnprob(p0, mods, periods, period_errs, bvs, bv_errs, gyro=True,
-        #              iso=False))
-        # p0[6] = np.log(2)
-        # print("lnprob 2 ", lnprob(p0, mods, periods, period_errs, bvs, bv_errs, gyro=True,
-        #              iso=False))
-        # assert 0
+        print("lnprob = ", new_lnprob(iso_p0, mods))
+        assert 0
 
     start = time.time()
 
