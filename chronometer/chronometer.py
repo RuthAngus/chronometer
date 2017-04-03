@@ -18,7 +18,7 @@ import priors
 from models import gc_model
 
 
-def gc_lnlike(params, period, period_errs, bv, bv_errs):
+def gc_lnlike(params, period, period_errs, bv, bv_errs, all_params=False):
     """
     Probability of age and model parameters given rotation period and colour.
     parameters:
@@ -30,11 +30,18 @@ def gc_lnlike(params, period, period_errs, bv, bv_errs):
     bv: (tuple)
         The B-V colour and colour uncertainty.
     """
-    model_periods = gc_model(params[:3], params[3:], bv)
+    if all_params:
+        N = int((len(params) - 3)/5)
+        pars = params[:3]
+        ln_ages = params[3:3+N]
+    else:
+        pars = params[:3]
+        ln_ages = params[3:]
+    model_periods = gc_model(pars, ln_ages, bv)
     return sum(-.5*((period - model_periods)/period_errs)**2)
 
 
-def iso_lnlike(lnparams, mods):
+def iso_lnlike(lnparams, mods, all_params=False):
     """
     Some isochronal likelihood function.
     parameters:
@@ -45,7 +52,10 @@ def iso_lnlike(lnparams, mods):
     mod: (object)
         An isochrones.py starmodel object.
     """
-    p = lnparams*1
+    if all_params:
+        p = lnparams[3:]
+    else:
+        p = lnparams*1
     N = int(len(p)/5)
 
     # Transform to linear space
@@ -116,17 +126,24 @@ def lnprob(params, *args):
     iso: (bool)
         If True, the iso likelihood will be used.
     """
-    iso, gyro = False, True  # GYRO
-    if len(params) > 5:
+    if len(params) == 3:
+        iso, gyro = False, True  # GYRO
+    elif len(params) % 5 == 0:
         iso, gyro = True, False  # ISO
+    else:
+        iso, gyro = True, True
+    print(iso, gyro)
 
-    if gyro:
-        print(args)
+    if iso and gyro:
+        mods, period, period_errs, bv, bv_errs = args
+        return gc_lnlike(params, period, period_errs, bv, bv_errs,
+                         all_params=True) + gyro_lnprior(params) + \
+            iso_lnlike(params, mods, all_params=True) + iso_lnprior(params)
+    elif gyro:
         period, period_errs, bv, bv_errs = args
         return gc_lnlike(params, period, period_errs, bv, bv_errs) + \
             gyro_lnprior(params)
     elif iso:
-        print(args)
         mods = args[0]
         return iso_lnlike(params, mods) + iso_lnprior(params)
 
@@ -208,13 +225,31 @@ if __name__ == "__main__":
     start = time.time()
 
     # Run emcee and plot corner
-    g, i = False, True
-    if g:  # If gyro inference
+    g, i = True, False
+    if g and i:
+        print("gyro and iso")
+        args = [mods, periods, period_errs, bvs, bv_errs]
+        truths = [.7725, .601, .5189, np.log(4.56), np.log(.5), np.log(1),
+                  np.log(1), 0., 0., np.log(10), np.log(10), 0., 0.]
+        labels = ["$a$", "$b$", "$n$", "$\ln(Age_1)$", "$\ln(Age_2)$",
+                  "$\ln(Mass_1)$", "$\ln(Mass_2)$", "$[Fe/H]_1$",
+                  "$[Fe/H]_2$", "$\ln(D_1)$", "$\ln(D_2)$", "$A_v1$",
+                  "$A_v2$"]
+    if g and not i:  # If gyro inference
+        print("gyro")
         p0 = gyro_p0*1
         args = [periods, period_errs, bvs, bv_errs]
-    elif i:  # If Iso inference.
+        truths = [.7725, .601, .5189]
+        labels = ["$a$", "$b$", "$n$"]
+    elif i and not g:  # If Iso inference.
+        print("iso")
         p0 = iso_p0*1
         args = [mods]
+        truths = [np.log(4.56), np.log(.5), np.log(1), np.log(1), 0., 0.,
+                np.log(10), np.log(10), 0., 0.]
+        labels = ["$\ln(Age_1)$", "$\ln(Age_2)$", "$\ln(Mass_1)$",
+                "$\ln(Mass_2)$", "$[Fe/H]_1$", "$[Fe/H]_2$", "$\ln(D_1)$",
+                "$\ln(D_2)$", "$A_v1$", "$A_v2$"]
 
     print("p0 = ", p0)
     nwalkers, nsteps, ndim = 64, 10000, len(p0)
@@ -230,11 +265,6 @@ if __name__ == "__main__":
     print("Time taken = ", (end - start)/60., "mins")
 
     flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
-    truths = [.7725, .601, .5189, np.log(4.56), np.log(.5), np.log(1),
-              np.log(1), 0., 0., np.log(10), np.log(10), 0., 0.]
-    labels = ["$a$", "$b$", "$n$", "$\ln(Age_1)$", "$\ln(Age_2)$",
-              "$\ln(Mass_1)$", "$\ln(Mass_2)$", "$[Fe/H]_1$", "$[Fe/H]_2$",
-              "$\ln(D_1)$", "$\ln(D_2)$", "$A_v1$", "$A_v2$"]
     fig = corner.corner(flat, labels=labels, truths=truths)
     fig.savefig("corner_test")
 
@@ -247,5 +277,5 @@ if __name__ == "__main__":
     for i in range(ndim):
         plt.clf()
         plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
-        plt.ylabel(labels[i])
+        # plt.ylabel(labels[i])
         plt.savefig("{}_trace".format(i))
