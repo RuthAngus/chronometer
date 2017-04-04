@@ -4,6 +4,15 @@ The priors
 
 import numpy as np
 
+
+def lng_prior(abn):
+    """
+    Gaussian priors on the gyro parameters.
+    """
+    a, b, n = abn
+    return -.5*((a - .7725)/.01)**2 - .5*((b - .601)/.01)**2 \
+        - .5*((n - .5189)/.01)**2
+
 def age_prior(age, bounds=(8,10.15)):
     """
     Uniform true age prior; where 'age' is actually log(age)
