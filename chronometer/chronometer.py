@@ -102,7 +102,6 @@ def lnprior(params):
     ln_mass = params[3+2*N:3+3*N]
     feh = params[3+3*N:3+4*N]
     d = params[3+4*N:3+5*N]
-    print("dist", d)
     Av = params[3+5*N:3+6*N]
     age_prior = sum([np.log(priors.age_prior(np.log10(1e9*np.exp(i))))
                      for i in ln_age])
@@ -110,13 +109,14 @@ def lnprior(params):
     distance_prior = sum([np.log(priors.distance_prior(np.exp(i))) for i
                           in d])
     Av_prior = sum([np.log(priors.AV_prior(Av[i])) for i in Av])
+    print("params = ", params)
     m = (-20 < params) * (params < 20)  # Broad bounds on all params.
+    print(m)
     if sum(m) == len(m):
+        print("yes")
         return age_prior + feh_prior + distance_prior + Av_prior
     else:
-        print(m)
-        print(params)
-        assert 0
+        print("No")
         return -np.inf
 
 
@@ -160,8 +160,6 @@ if __name__ == "__main__":
     Avs = np.array([0., 0.])
     p0 = np.concatenate((gc, np.log(masses), np.log(ages), fehs, np.log(ds),
                          Avs))
-    print(p0)
-    print(np.exp(p0))
 
     # test on the Sun at 10 pc first.
     J, J_err = 3.711, .01  # absolute magnitudes/apparent at D = 10pc
@@ -192,44 +190,19 @@ if __name__ == "__main__":
     # plt.ylabel("Period (days)")
     # plt.savefig("period_age_data")
 
-    # test the gyro lhf
-    gyro_p0 = np.concatenate((p0[:3], p0[5:7]))
-    print("gyro_lnlike = ", gc_lnlike(gyro_p0, periods, period_errs, bvs,
-                                      bv_errs))
-
-    # # test the gyro lnprob
-    print("gyro_lnprob = ", lnprob(gyro_p0, periods, period_errs, bvs,
-                                   bv_errs))
-
-    # test the iso_lnlike
-    mist = MIST_Isochrone()
-    iso_p0 = p0[3:]
 
     # iso_lnlike preamble.
-    start = time.time()
+    mist = MIST_Isochrone()
     mods = []
     for i in range(len(periods)):
         mods.append(StarModel(mist, J=(Js[i], J_errs[i]),
                               H=(Hs[i], H_errs[i]), K=(Ks[i], K_errs[i]),
                               use_emcee=True))
 
-        start = time.time()
-        mods[i].lnlike(iso_p0)
-        end = time.time()
-        print("preamble time = ", end - start)
-
-        start = time.time()
-        print("iso_lnlike = ", iso_lnlike(iso_p0, mods))
-        end = time.time()
-        print("lhf time = ", end - start)
-
-        # test the lnprob.
-        print("lnprob = ", lnprob(iso_p0, mods))
-
     start = time.time()
 
     # Run emcee and plot corner
-    i, g = True, True
+    i, g = True, False
     if g and i:
         print("gyro and iso")
         args = [mods, periods, period_errs, bvs, bv_errs]
