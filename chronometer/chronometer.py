@@ -102,6 +102,7 @@ def lnprior(params):
     ln_mass = params[3+2*N:3+3*N]
     feh = params[3+3*N:3+4*N]
     d = params[3+4*N:3+5*N]
+    print("dist", d)
     Av = params[3+5*N:3+6*N]
     age_prior = sum([np.log(priors.age_prior(np.log10(1e9*np.exp(i))))
                      for i in ln_age])
@@ -109,36 +110,36 @@ def lnprior(params):
     distance_prior = sum([np.log(priors.distance_prior(np.exp(i))) for i
                           in d])
     Av_prior = sum([np.log(priors.AV_prior(Av[i])) for i in Av])
-    m = (-10 < params) * (params < 10)  # Broad bounds on all params.
+    m = (-20 < params) * (params < 20)  # Broad bounds on all params.
     if sum(m) == len(m):
         return age_prior + feh_prior + distance_prior + Av_prior
     else:
+        print(m)
+        print(params)
+        assert 0
         return -np.inf
 
 
 def lnprob(params, *args):
     """
     The joint log-probability of age given gyro and iso parameters.
+    params: (array)
+        The parameter array.
     mod: (list)
         list of pre-computed star model objects.
-    gyro: (bool)
-        If True, the gyro likelihood will be used.
-    iso: (bool)
-        If True, the iso likelihood will be used.
     """
-    if len(params) == 3:
+    if len(params) < 6:
         iso, gyro = False, True  # GYRO
     elif len(params) % 5 == 0:
         iso, gyro = True, False  # ISO
     else:
         iso, gyro = True, True
-    print(iso, gyro)
 
     if iso and gyro:
         mods, period, period_errs, bv, bv_errs = args
         return gc_lnlike(params, period, period_errs, bv, bv_errs,
-                         all_params=True) + gyro_lnprior(params) + \
-            iso_lnlike(params, mods, all_params=True) + iso_lnprior(params)
+                         all_params=True) + \
+            iso_lnlike(params, mods, all_params=True) + lnprior(params)
     elif gyro:
         period, period_errs, bv, bv_errs = args
         return gc_lnlike(params, period, period_errs, bv, bv_errs) + \
@@ -159,6 +160,8 @@ if __name__ == "__main__":
     Avs = np.array([0., 0.])
     p0 = np.concatenate((gc, np.log(masses), np.log(ages), fehs, np.log(ds),
                          Avs))
+    print(p0)
+    print(np.exp(p0))
 
     # test on the Sun at 10 pc first.
     J, J_err = 3.711, .01  # absolute magnitudes/apparent at D = 10pc
@@ -193,9 +196,10 @@ if __name__ == "__main__":
     gyro_p0 = np.concatenate((p0[:3], p0[5:7]))
     print("gyro_lnlike = ", gc_lnlike(gyro_p0, periods, period_errs, bvs,
                                       bv_errs))
+
     # # test the gyro lnprob
-    # print("gyro_lnprob = ", lnprob(gyro_p0, periods, period_errs, bvs,
-    #                                bv_errs))
+    print("gyro_lnprob = ", lnprob(gyro_p0, periods, period_errs, bvs,
+                                   bv_errs))
 
     # test the iso_lnlike
     mist = MIST_Isochrone()
@@ -225,7 +229,7 @@ if __name__ == "__main__":
     start = time.time()
 
     # Run emcee and plot corner
-    g, i = True, False
+    i, g = True, True
     if g and i:
         print("gyro and iso")
         args = [mods, periods, period_errs, bvs, bv_errs]
@@ -239,8 +243,8 @@ if __name__ == "__main__":
         print("gyro")
         p0 = gyro_p0*1
         args = [periods, period_errs, bvs, bv_errs]
-        truths = [.7725, .601, .5189]
-        labels = ["$a$", "$b$", "$n$"]
+        truths = [.7725, .601, .5189, np.log(4.56), np.log(.5)]
+        labels = ["$a$", "$b$", "$n$", "$\ln(Age_1)$", "$\ln(Age_2)$"]
     elif i and not g:  # If Iso inference.
         print("iso")
         p0 = iso_p0*1
