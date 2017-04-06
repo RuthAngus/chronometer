@@ -34,6 +34,9 @@ class ChronometerTestCase(unittest.TestCase):
         """
         Test that all the values in the input files are within reasonable
         ranges.
+        age,age_err,bv,bv_err,period,period_err,v,v_err,ks,ks_err,vk,vk_err,
+        j,j_err,h,h_err,k,k_err,parallax,parallax_err,Teff,Teff_err,logg,
+        logg_err,feh,feh_err,mass,mass_err,Av,Av_err
         """
         DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
         d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
@@ -41,7 +44,8 @@ class ChronometerTestCase(unittest.TestCase):
                   [0, 30], [0, 10], [0, 30], [0, 10], [0, 30], [0, 10],
                   [0, 30], [0, 10], [0, 30], [0, 10], [0, 30], [0, 10],
                   [0, 1e5], [0, 100], [1000, 10000], [1, 1000], [2, 6],
-                  [0, 3], [-4, 6], [0, 10]]
+                  [0, 3], [-4, 6], [0, 10], [0, 100], [0, 3], [-1, 10],
+                  [0, 5]]
 
         b = True
         for i, bound in enumerate(bounds):
