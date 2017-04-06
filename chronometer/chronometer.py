@@ -191,10 +191,15 @@ if __name__ == "__main__":
                          d.Av.values))
     params_init = p0*1
 
+    """
+    stopped here: need to continue by fixing colours.
+    """
+
     # iso_lnlike preamble.
     mist = MIST_Isochrone()
     mods = []
-    for i in range(len(periods)):
+    for i in range(len(d.period.values)):
+        print(d.j.values[i])
         mods.append(StarModel(mist, J=(d.j.values[i], d.j_err.values[i]),
                               H=(d.h.values[i], d.h_err.values[i]),
                               K=(d.k.values[i], d.k_err.values[i]),
@@ -202,6 +207,7 @@ if __name__ == "__main__":
                               logg=(d.logg.values[i], d.logg_err.values[i]),
                               use_emcee=True))
     start = time.time()
+    assert 0
 
     # Run emcee and plot corner
     i, g = True, True
