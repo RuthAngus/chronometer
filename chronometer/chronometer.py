@@ -17,6 +17,14 @@ import corner
 import priors
 from models import gc_model
 
+plotpar = {'axes.labelsize': 18,
+           'font.size': 10,
+           'legend.fontsize': 18,
+           'xtick.labelsize': 18,
+           'ytick.labelsize': 18,
+           'text.usetex': True}
+plt.rcParams.update(plotpar)
+
 
 def gc_lnlike(params, period, period_errs, bv, bv_errs, all_params=False):
     """
@@ -155,54 +163,52 @@ def lnprob(params, *args):
         return iso_lnlike(params, mods) + iso_lnprior(params)
 
 
+def replace_NaNs_with_inits(data):
+    data.mass.values[~np.isfinite(data.mass.values)] \
+        = np.ones(len(data.mass.values[~np.isfinite(data.mass.values)]))
+    data.feh.values[~np.isfinite(data.feh.values)] \
+        = np.zeros(len(data.feh.values[~np.isfinite(data.feh.values)]))
+    data.Av.values[~np.isfinite(data.Av.values)] \
+        = np.zeros(len(data.Av.values[~np.isfinite(data.Av.values)]))
+    # data.parallax.values[~np.isfinite(data.parallax.values)] \
+    #     = [None] * \
+    #     (len(data.parallax.values[~np.isfinite(data.parallax.values)]))
+    return data
+
+
 if __name__ == "__main__":
+
+    DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
 
     # The parameters
     gc = np.array([.7725, .601, .5189])
-    ages = np.array([4.56, .5])
-    masses = np.array([1., 1.])
-    fehs = np.array([0., 0.])
-    ds = np.array([10., 10.])
-    Avs = np.array([0., 0.])
-    p0 = np.concatenate((gc, np.log(masses), np.log(ages), fehs, np.log(ds),
-                         Avs))
+    d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
 
-    # test on the Sun at 10 pc first.
-    J, J_err = 3.711, .01  # absolute magnitudes/apparent at D = 10pc
-    H, H_err = 3.453, .01
-    K, K_err = 3.357, .01
-
-    # The data
-    Js = np.array([J, J])
-    J_errs = np.array([J_err, J_err])
-    Hs = np.array([H, H])
-    H_errs = np.array([H_err, H_err])
-    Ks = np.array([K, K])
-    K_errs = np.array([K_err, K_err])
-    parallaxes = np.array([.1*1e3, .1*1e3])
-    parallax_errs = np.array([.001, .001])
-    periods = np.array([26., 8.3])
-    period_errs = np.array([.1, .1])
-    bvs = np.array([.65, .65])
-    bv_errs = np.array([.01, .01])
-
+    d = replace_NaNs_with_inits(d)
+    p0 = np.concatenate((gc, np.log(d.mass.values),
+                         np.log(d.age.values), d.feh.values,
+                         np.log(1./d.parallax.values*1e3),
+                         d.Av.values))
+    params_init = p0*1
 
     # iso_lnlike preamble.
     mist = MIST_Isochrone()
     mods = []
     for i in range(len(periods)):
-        mods.append(StarModel(mist, J=(Js[i], J_errs[i]),
-                              H=(Hs[i], H_errs[i]), K=(Ks[i], K_errs[i]),
-                              Teff=(5700, 100), logg=(4.45, .1),
+        mods.append(StarModel(mist, J=(d.j.values[i], d.j_err.values[i]),
+                              H=(d.h.values[i], d.h_err.values[i]),
+                              K=(d.k.values[i], d.k_err.values[i]),
+                              Teff=(d.Teff.values[i], d.Teff_err.values[i]),
+                              logg=(d.logg.values[i], d.logg_err.values[i]),
                               use_emcee=True))
-
     start = time.time()
 
     # Run emcee and plot corner
     i, g = True, True
     if g and i:
         print("gyro and iso")
-        args = [mods, periods, period_errs, bvs, bv_errs]
+        args = [mods, d.period.values, d.period_err.values, d.bv.values,
+                d.bv_err.values]
         truths = [.7725, .601, .5189, np.log(1), np.log(1), np.log(4.56),
                   np.log(.5), 0., 0., np.log(10), np.log(10), 0., 0.]
         labels = ["$a$", "$b$", "$n$", "$\ln(Age_1)$", "$\ln(Age_2)$",
@@ -212,7 +218,8 @@ if __name__ == "__main__":
     if g and not i:  # If gyro inference
         print("gyro")
         p0 = np.concatenate((p0[:3], p0[5:7]))
-        args = [periods, period_errs, bvs, bv_errs]
+        args = [d.period.values, d.period_err.values, d.bv.values,
+                d.bv_err.values]
         truths = [.7725, .601, .5189, np.log(4.56), np.log(.5)]
         labels = ["$a$", "$b$", "$n$", "$\ln(Age_1)$", "$\ln(Age_2)$"]
     elif i and not g:  # If Iso inference.
@@ -226,11 +233,11 @@ if __name__ == "__main__":
                 "$\ln(D_2)$", "$A_v1$", "$A_v2$"]
 
     print("p0 = ", p0)
-    nwalkers, nsteps, ndim = 64, 5000, len(p0)
+    nwalkers, nsteps, ndim = 64, 10000, len(p0)
     p0 = [1e-4*np.random.rand(ndim) + p0 for i in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=args)
     print("burning in...")
-    pos, _, _ = sampler.run_mcmc(p0, 1000)
+    pos, _, _ = sampler.run_mcmc(p0, 2000)
     sampler.reset()
     print("production run...")
     sampler.run_mcmc(pos, nsteps)
@@ -246,12 +253,17 @@ if __name__ == "__main__":
     xs = np.linspace(.1, 6, 100)
     result = [np.median(flat[:, 0]), np.median(flat[:, 1]),
               np.median(flat[:, 2])]
-    ps0 = gc_model(p0[:3], np.log(xs), .65)
-    ps1 = gc_model(result[:3], np.log(xs), .65)
+    age_results = np.exp(np.array([np.median(flat[:, 5]),
+                                   np.median(flat[:, 6])]))
+    print(params_init)
+    print(params_init[:3])
+    ps0 = gc_model(params_init[:3], np.log(xs), .65)
+    ps1 = gc_model(result, np.log(xs), .65)
     plt.clf()
-    plt.plot(ages, periods, "k.")
-    plt.plot(xs, ps0)
-    plt.plot(xs, ps1)
+    plt.plot(d.age.values, d.period.values, "k.", ms=20)
+    plt.plot(age_results, d.period.values, "b.", ms=20)
+    plt.plot(xs, ps0, label="Before")
+    plt.plot(xs, ps1, label="After")
     plt.xlabel("Age (Gyr)")
     plt.ylabel("Period (days)")
     plt.savefig("period_age_data")
@@ -265,5 +277,4 @@ if __name__ == "__main__":
     for i in range(ndim):
         plt.clf()
         plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
-        # plt.ylabel(labels[i])
         plt.savefig("{}_trace".format(i))
