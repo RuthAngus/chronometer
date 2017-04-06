@@ -8,11 +8,13 @@ import os
 import time
 import numpy as np
 import matplotlib.pyplot as plt
-from isochrones import StarModel
-from isochrones.mist import MIST_Isochrone
+import h5py
 
 import emcee
 import corner
+from isochrones import StarModel
+from isochrones.mist import MIST_Isochrone
+
 import priors
 
 
@@ -118,17 +120,7 @@ def am(M, D):
     return 5*np.log10(D) - 5 - M
 
 
-if __name__ == "__main__":
-
-    # A working example
-    mist = MIST_Isochrone()
-    mod = StarModel(mist, Teff=(5700, 100), logg=(4.5, 0.1), feh=(0.0, 0.1),
-                    use_emcee=True)
-    mod.fit(basename='spec_demo')
-    fig = mod.corner_physical()
-    fig.savefig("corner_physical")
-
-    FIG_DIR = "/Users/ruthangus/projects/chronometer/chronometer/figures"
+def sun_demo(gyro, iso):
 
     # The parameters
     a, b, n = .7725, .601, .5189
@@ -179,7 +171,7 @@ if __name__ == "__main__":
     print("lhf time = ", end - start)
 
     # test the lnprob.
-    print("lnprob = ", lnprob(params, mod, period, bv, gyro=True, iso=True))
+    print("lnprob = ", lnprob(params, mod, period, bv, gyro=gyro, iso=iso))
 
     # Plot profile likelihoods
     ages = np.log(np.arange(1., 10., 1))
@@ -187,11 +179,11 @@ if __name__ == "__main__":
     fehs = np.arange(-.1, .1, .01)
     ds = np.log(np.arange(8, 20, 1))
     Avs = np.arange(.1, .5, .01)
-    probtest(ages, 3)
-    probtest(masses, 4)
-    probtest(fehs, 5)
-    probtest(ds, 6)
-    probtest(Avs, 7)
+    # probtest(ages, 3)
+    # probtest(masses, 4)
+    # probtest(fehs, 5)
+    # probtest(ds, 6)
+    # probtest(Avs, 7)
 
     start = time.time()
 
@@ -232,3 +224,30 @@ if __name__ == "__main__":
         plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
         plt.ylabel(labels[i])
         plt.savefig(os.path.join(FIG_DIR, "{}_trace_single".format(i)))
+
+    f = h5py.File(os.path.join(RESULTS_DIR, "all_single.h5", "w"))
+    data = f.create_dataset("samples",
+                            np.shape(sampler.get_coords(flat=True)))
+    data[:, :] = sampler.get_coords(flat=True)
+    f.close()
+
+    age_hist(flat, gyro, iso)
+
+def age_hist(flat, gyro, iso):
+    fname = "age_hist_all"
+    if gyro and not iso:
+        fname = "age_hist_gyro"
+    elif iso and not gyro:
+        fname = "age_hist_iso"
+
+
+    ln_age = flat[:, 3]
+    plt.clf()
+    plt.hist(ln_age)
+    plt.savefig(os.path.join(FIG_DIR, fname))
+
+
+if __name__ == "__main__":
+    FIG_DIR = "/Users/ruthangus/projects/chronometer/chronometer/figures"
+    RESULTS_DIR = "/Users/ruthangus/projects/chronometer/chronometer/results"
+    sun_demo(True, True)
