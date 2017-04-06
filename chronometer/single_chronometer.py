@@ -17,6 +17,14 @@ from isochrones.mist import MIST_Isochrone
 
 import priors
 
+plotpar = {'axes.labelsize': 20,
+           'font.size': 20,
+           'legend.fontsize': 20,
+           'xtick.labelsize': 15,
+           'ytick.labelsize': 15,
+           'text.usetex': True}
+plt.rcParams.update(plotpar)
+
 
 def GC_model(params, bv):
     """
@@ -120,7 +128,7 @@ def am(M, D):
     return 5*np.log10(D) - 5 - M
 
 
-def sun_demo(gyro, iso):
+def sun_demo(fname, gyro=True, iso=True, plot=False, spec=False):
 
     # The parameters
     a, b, n = .7725, .601, .5189
@@ -129,63 +137,24 @@ def sun_demo(gyro, iso):
     params = np.array([a, b, n, np.log(age), np.log(mass), feh, np.log(d),
                        Av])
 
-    # test on the Sun at 10 pc first.
-    # J, J_err = am(3.711, d), .01  # absolute magnitudes/apparent at D = 10pc
-    # H, H_err = am(3.453, d), .01
-    # K, K_err = am(3.357, d), .01
-
     J, J_err = 3.711, .01  # absolute magnitudes/apparent at D = 10pc
     H, H_err = 3.453, .01
     K, K_err = 3.357, .01
 
     bands = dict(J=(J, J_err), H=(H, H_err), K=(K, K_err),)
-    parallax = (1./d*1e3, .01)
-    period = (26., 1.)
-    bv = (.65, .01)
-
-    # test the gyro model
-    gyro_params = np.array([a, b, n, np.log(4.56)])
-    print(GC_model(gyro_params, bv[0]))
-
-    # test the gyro lhf
-    print("gyro_lnlike = ", gc_lnlike(gyro_params, period, bv))
+    parallax, period, bv = (1./d*1e3, .01), (26.6098830128, 1.), (.65, .01)
+    Teff, logg, feh = (5700, 100), (4.45, .1), (0., .1)
 
     # test the iso_lnlike
     mist = MIST_Isochrone()
-    iso_params = np.array([np.log(mass), np.log(age), feh, np.log(d), Av])
 
     # iso_lnlike preamble.
-    start = time.time()
-    mod = StarModel(mist, J=(J, J_err), H=(H, H_err), K=(K, K_err),
-                    parallax=parallax, use_emcee=True)
-    p0 = np.array([params[0], params[1], params[2], params[3], params[4]])
-
-    start = time.time()
-    mod.lnlike(p0)
-    end = time.time()
-    print("preamble time = ", end - start)
-
-    start = time.time()
-    print("iso_lnlike = ", iso_lnlike(params, mod))
-    end = time.time()
-    print("lhf time = ", end - start)
-
-    # test the lnprob.
-    print("lnprob = ", lnprob(params, mod, period, bv, gyro=gyro, iso=iso))
-
-    # Plot profile likelihoods
-    ages = np.log(np.arange(1., 10., 1))
-    masses = np.log(np.arange(.1, 2., .1))
-    fehs = np.arange(-.1, .1, .01)
-    ds = np.log(np.arange(8, 20, 1))
-    Avs = np.arange(.1, .5, .01)
-    # probtest(ages, 3)
-    # probtest(masses, 4)
-    # probtest(fehs, 5)
-    # probtest(ds, 6)
-    # probtest(Avs, 7)
-
-    start = time.time()
+    if spec:
+        mod = StarModel(mist, Teff=Teff, logg=logg, feh=feh,
+                        parallax=parallax, use_emcee=True)
+    else:
+        mod = StarModel(mist, J=(J, J_err), H=(H, H_err), K=(K, K_err),
+                        parallax=parallax, use_emcee=True)
 
     # Run emcee
     nwalkers, nsteps, ndim = 64, 5000, len(params)
@@ -202,52 +171,77 @@ def sun_demo(gyro, iso):
     result = [np.median(flat[:, i]) for i in range(len(flat[0, :]))]
     print(result)
 
-    truths = [.7725, .601, .5189, np.log(4.56), np.log(1), 0., np.log(d),
-              0.]
-    print(truths)
-    labels = ["$a$", "$b$", "$n$", "$\ln(Age)$", "$\ln(Mass)$", "$[Fe/H]$",
-              "$\ln(D)$", "$A_v$"]
-    fig = corner.corner(flat, labels=labels, truths=truths)
-    fig.savefig(os.path.join(FIG_DIR, "corner_single"))
+    if plot:
+        truths = [.7725, .601, .5189, np.log(4.56), np.log(1), 0., np.log(d),
+                  0.]
+        print(truths)
+        labels = ["$a$", "$b$", "$n$", "$\ln(Age)$", "$\ln(Mass)$",
+                  "$[Fe/H]$", "$\ln(D)$", "$A_v$"]
+        fig = corner.corner(flat, labels=labels, truths=truths)
+        fig.savefig(os.path.join(FIG_DIR, "corner_single"))
 
-    end = time.time()
-    print("time taken = ", (end - start)/60., "minutes")
-
-    # Plot probability trace.
-    plt.clf()
-    plt.plot(sampler.lnprobability.T, "k")
-    plt.savefig(os.path.join(FIG_DIR, "prob_trace_single"))
-
-    # Plot individual parameter traces.
-    for i in range(ndim):
+        # Plot probability trace.
         plt.clf()
-        plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
-        plt.ylabel(labels[i])
-        plt.savefig(os.path.join(FIG_DIR, "{}_trace_single".format(i)))
+        plt.plot(sampler.lnprobability.T, "k")
+        plt.savefig(os.path.join(FIG_DIR, "prob_trace_single"))
 
-    f = h5py.File(os.path.join(RESULTS_DIR, "all_single.h5", "w"))
-    data = f.create_dataset("samples",
-                            np.shape(sampler.get_coords(flat=True)))
-    data[:, :] = sampler.get_coords(flat=True)
+        # Plot individual parameter traces.
+        for i in range(ndim):
+            plt.clf()
+            plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
+            plt.ylabel(labels[i])
+            plt.savefig(os.path.join(FIG_DIR, "{}_trace_single".format(i)))
+
+    f = h5py.File(os.path.join(RESULTS_DIR, "{}.h5".format(fname)), "w")
+    data = f.create_dataset("samples", np.shape(flat))
+    data[:, :] = flat
     f.close()
 
-    age_hist(flat, gyro, iso)
 
-def age_hist(flat, gyro, iso):
-    fname = "age_hist_all"
-    if gyro and not iso:
-        fname = "age_hist_gyro"
-    elif iso and not gyro:
-        fname = "age_hist_iso"
+def age_hist(fname):
+    """
+    Make a simple 1d histogram of the marginal posterior for age using
+    different methods.
+    params:
+    -------
+    fname: (str)
+        The name of the h5 results file *and* the name of the figure.
+    """
 
+    with h5py.File(os.path.join(RESULTS_DIR, "all_single.h5"),
+                   "r") as f:
+        flat0 = f["samples"][...]
+    with h5py.File(os.path.join(RESULTS_DIR,
+                                "all_spec_single.h5".format(fname)),
+                   "r") as f:
+        flat1 = f["samples"][...]
+    with h5py.File(os.path.join(RESULTS_DIR, "gyro_single.h5".format(fname)),
+                   "r") as f:
+        flat2 = f["samples"][...]
 
-    ln_age = flat[:, 3]
     plt.clf()
-    plt.hist(ln_age)
+    n = 30
+    plt.hist(np.exp(flat0[:, 3]), n, normed=True, color=".7", alpha=.5,
+             label="$\mathrm{Colours}$")
+    plt.hist(np.exp(flat1[:, 3]), n, normed=True, color=".3", alpha=.5,
+             label="$\mathrm{Spectra}$")
+    plt.hist(np.exp(flat2[:, 3]), n, normed=True, color="k", alpha=.8,
+             label="$\mathrm{Gyro}$")
+    plt.legend()
+    plt.xlabel("$\mathrm{Age~(Gyr)}$")
+    plt.axvline(4.567)
+    plt.subplots_adjust(bottom=.15)
     plt.savefig(os.path.join(FIG_DIR, fname))
 
 
 if __name__ == "__main__":
     FIG_DIR = "/Users/ruthangus/projects/chronometer/chronometer/figures"
     RESULTS_DIR = "/Users/ruthangus/projects/chronometer/chronometer/results"
-    sun_demo(True, True)
+    # sun_demo("all_single", gyro=False, iso=True, plot=False, spec=False)
+    # sun_demo("all_spec_single", gyro=False, iso=True, plot=False, spec=True)
+    # from models import gc_model
+    # par = [.7725, .601, .5189]
+    # print(gc_model(par, np.log(4.567), .65))
+    # assert 0
+    # sun_demo("gyro_single", gyro=True, iso=False, plot=False, spec=True)
+    age_hist("all_hist")
