@@ -199,8 +199,6 @@ if __name__ == "__main__":
     mist = MIST_Isochrone()
     mods = []
     for i in range(len(d.period.values)):
-        # print(d.j.values[i])
-        # print(d)
         param_dict = {"V": (d.v.values[i], d.v_err.values[i]),
                       "Ks": (d.ks.values[i], d.ks_err.values[i]),
                       "J": (d.j.values[i], d.j_err.values[i]),
@@ -215,14 +213,8 @@ if __name__ == "__main__":
         # Remove empty values.
         param_dict = {k: param_dict[k] for k in param_dict if
                       np.isfinite(param_dict[k]).any()}
-        mods.append(StarModel(mist, param_dict))
+        mods.append(StarModel(mist, **param_dict))
 
-        # mods.append(StarModel(mist, J=(d.j.values[i], d.j_err.values[i]),
-        #                       H=(d.h.values[i], d.h_err.values[i]),
-        #                       K=(d.k.values[i], d.k_err.values[i]),
-        #                       Teff=(d.Teff.values[i], d.Teff_err.values[i]),
-        #                       logg=(d.logg.values[i], d.logg_err.values[i]),
-        #                       use_emcee=True))
     start = time.time()
 
     # Run emcee and plot corner
