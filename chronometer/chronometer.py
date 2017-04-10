@@ -17,6 +17,8 @@ import corner
 import priors
 from models import gc_model
 
+import teff_bv as tbv
+
 plotpar = {'axes.labelsize': 18,
            'font.size': 10,
            'legend.fontsize': 18,
@@ -151,6 +153,10 @@ def lnprob(params, *args):
 
     if iso and gyro:
         mods, period, period_errs, bv, bv_errs = args
+        # print(gc_lnlike(params, period, period_errs, bv, bv_errs,
+        #                  all_params=True),
+        #       iso_lnlike(params, mods, all_params=True), lnprior(params))
+        # assert 0
         return gc_lnlike(params, period, period_errs, bv, bv_errs,
                          all_params=True) + \
             iso_lnlike(params, mods, all_params=True) + lnprior(params)
@@ -176,6 +182,15 @@ def replace_NaNs_with_inits(data):
     return data
 
 
+def vk2teff(vk):
+    """
+    From https://arxiv.org/pdf/astro-ph/9911367.pdf
+    For 0.82 < VK < 3.29
+    """
+    a, b, c = 8686.22, -2441.65, 334.789
+    return a + b*vk + c*vk**2
+
+
 if __name__ == "__main__":
 
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
@@ -190,10 +205,6 @@ if __name__ == "__main__":
                          np.log(1./d.parallax.values*1e3),
                          d.Av.values))
     params_init = p0*1
-
-    """
-    stopped here: need to continue by fixing colours.
-    """
 
     # iso_lnlike preamble.
     mist = MIST_Isochrone()
@@ -211,14 +222,27 @@ if __name__ == "__main__":
                                    d.parallax_err.values[i])}
 
         # Remove empty values.
+        # print(param_dict)
         param_dict = {k: param_dict[k] for k in param_dict if
-                      np.isfinite(param_dict[k]).any()}
+                      np.isfinite(param_dict[k]).all()}
         mods.append(StarModel(mist, **param_dict))
 
     start = time.time()
 
     # Run emcee and plot corner
     i, g = True, True
+
+    if g:  # Convert V-K to B-V
+        bv = d.bv.values*1
+        m = np.isfinite(bv)
+        teff = vk2teff(d.vk.values[~m])
+        new_bv = tbv.teff2bv(teff, 4.44, 0)
+        bv[~m] = new_bv
+        d.bv = bv
+        bv_err = d.bv_err.values*1
+        bv_err[~m] = np.ones(len(bv[~m])) * .01
+        d.bv_err = bv_err
+
     if g and i:
         print("gyro and iso")
         args = [mods, d.period.values, d.period_err.values, d.bv.values,
