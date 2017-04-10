@@ -6,7 +6,7 @@ import os
 import numpy as np
 import unittest
 from chronometer import lnprior, lnprob, replace_nans_with_inits, \
-    make_param_dict
+    make_param_dict, get_inits, get_mod_list
 import pandas as pd
 from isochrones import StarModel
 from isochrones.mist import MIST_Isochrone
@@ -30,6 +30,7 @@ class ChronometerTestCase(unittest.TestCase):
         p0 = np.concatenate((gc, np.log(masses), np.log(ages), fehs,
                              np.log(ds), Avs))
 
+        print(lnprior(p0))
         b = np.isfinite(lnprior(p0))
         self.assertTrue(b)
 
@@ -58,33 +59,11 @@ class ChronometerTestCase(unittest.TestCase):
 
     def test_lnprobs(self):
         DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
-        # The parameters
-        gc = np.array([.7725, .601, .5189])
         d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
-
-        d = replace_nans_with_inits(d)
-        p0 = np.concatenate((gc, np.log(d.mass.values),
-                            np.log(d.age.values), d.feh.values,
-                            np.log(1./d.parallax.values*1e3),
-                            d.Av.values))
-        params_init = p0*1
-        # iso_lnlike preamble.
-        mist = MIST_Isochrone()
-        mods = []
-        for i in range(len(d.period.values)):
-            param_dict = make_param_dict(d, i)
-            # Remove missing parameters from the dict.
-            param_dict = {k: param_dict[k] for k in param_dict if
-                        np.isfinite(param_dict[k]).all()}
-            mods.append(StarModel(mist, **param_dict))
-        print("iso")
-        p0 = p0[3:]
-        args = [mods, "iso"]
-        truths = [np.log(1), None, np.log(4.56), np.log(2.5), 0., None,
-                np.log(10), np.log(2400), 0., None]
-        labels = ["$\ln(Mass_1)$", "$\ln(Mass_2)$", "$\ln(Age_1)$",
-                  "$\ln(Age_2)$", "$[Fe/H]_1$", "$[Fe/H]_2$", "$\ln(D_1)$",
-                  "$\ln(D_2)$", "$A_{v1}$", "$A_{v2}$"]
+        p0 = get_inits(d)
+        mods = get_mod_list(d)
+        args = [mods, d.period.values, d.period_err.values, d.bv.values,
+                d.bv_err.values]
         self.assertTrue(np.isfinite((lnprob(p0, *args))))
 
 
