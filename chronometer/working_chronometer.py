@@ -44,7 +44,7 @@ def gc_lnlike(params, period, period_errs, bv, bv_errs, all_params=False):
     if all_params:
         N = int((len(params) - 3)/5)
         pars = params[:3]
-        ln_ages = params[3:3+N]
+        ln_ages = params[3+N:3+2*N]
     else:
         pars = params[:3]
         ln_ages = params[3:]
