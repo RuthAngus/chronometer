@@ -13,6 +13,7 @@ def lng_prior(abn):
     return -.5*((a - .7725)/.01)**2 - .5*((b - .601)/.01)**2 \
         - .5*((n - .5189)/.01)**2
 
+
 def age_prior(age, bounds=(8,10.15)):
     """
     Uniform true age prior; where 'age' is actually log(age)
@@ -21,6 +22,7 @@ def age_prior(age, bounds=(8,10.15)):
     if age < minage or age > maxage:
         return 0
     return np.log(10) * 10**age / (10**maxage - 10**minage)
+
 
 def distance_prior(distance, bounds=(0,3000)):
     """
@@ -31,10 +33,12 @@ def distance_prior(distance, bounds=(0,3000)):
         return 0
     return 3/max_distance**3 * distance**2
 
+
 def AV_prior(AV, bounds=(0,1.)):
     if AV < bounds[0] or AV > bounds[1]:
         return 0
     return 1./bounds[1]
+
 
 def q_prior(q, m=1, gamma=0.3, bounds=(0.1,1)):
     """Default prior on mass ratio q ~ q^gamma
@@ -52,6 +56,7 @@ def q_prior(q, m=1, gamma=0.3, bounds=(0.1,1)):
         result[(q < qmin) | (q > qmax)] = 0
     return result
 
+
 def salpeter_prior(m,alpha=-2.35, bounds=(0.1,10)):
     minmass, maxmass = bounds
     C = (1+alpha)/(maxmass**(1+alpha)-minmass**(1+alpha))
@@ -64,6 +69,7 @@ def salpeter_prior(m,alpha=-2.35, bounds=(0.1,10)):
         result = C*m**(alpha)
         result[(m < minmass) | (m > maxmass)] = 0
         return result
+
 
 def feh_prior(feh, bounds=None, halo_fraction=0.001):
     """feh PDF based on local SDSS distribution

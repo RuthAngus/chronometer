@@ -16,5 +16,5 @@ def gc_model(params, ln_age, bv):
         A an array containing colour.
     """
     a, b, n = params
-    a, b, n = .7725, .601, .5189
+    # a, b, n = .7725, .601, .5189
     return a*(np.exp(ln_age)*1e3)**n * (bv - .4)**b
