@@ -44,7 +44,7 @@ def gc_lnlike(params, period, period_errs, bv, bv_errs, all_params=False):
     if all_params:
         N = int((len(params) - 3)/5)
         pars = params[:3]
-        ln_ages = params[3:3+N]
+        ln_ages = params[3+N:3+2*N]
     else:
         pars = params[:3]
         ln_ages = params[3:]
@@ -187,7 +187,7 @@ def plot_gyro_result(flat, i, g):
     plt.legend()
     plt.xlabel("$\mathrm{Age~(Gyr)}$")
     plt.ylabel("$\mathrm{Period~(days)}$")
-    plt.savefig("period_age_data")
+    plt.savefig("period_age_data3")
 
 
 def assign_args(p0, mods, d, i, g):
