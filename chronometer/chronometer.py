@@ -129,11 +129,11 @@ def plot_gyro_result(d, mcmc_result):
     ps0 = gc_model(mcmc_result[:3], np.log(xs), .65)
     ps1 = gc_model(mcmc_result[:3], np.log(xs), .65)
     N = len(d.age.values)
-    age_results = mcmc_result[3+N:3+2*N]
+    age_results = np.exp(mcmc_result[3+N:3+2*N])
 
     plt.clf()
-    plt.plot(d.age.values, d.period.values, "k.", ms=20)
-    plt.plot(age_results, d.period.values, "m.", ms=20)
+    plt.plot(d.age.values, d.period.values, "k.")
+    plt.plot(age_results, d.period.values, "m.")
     plt.plot(xs, ps0, label="$\mathrm{Before}$")
     plt.plot(xs, ps1, label="$\mathrm{After}$")
     plt.legend()
@@ -192,9 +192,16 @@ if __name__ == "__main__":
     end = time.time()
     print("Time taken = ", (end - start)/60., "mins")
 
+    flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
+    flat = flat[-1000:, :]
+    fig = corner.corner(flat)
+    fig.savefig("corner")
     mcmc_result = map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
-                    zip(*np.percentile(flatchain, [16, 50, 84], axis=0)))
-    print(mcmc_result)
+                    zip(*np.percentile(flat, [16, 50, 84], axis=0)))
+    mcmc_result = np.percentile(flat, 50, axis=0)
+    print("results = ", mcmc_result)
+    N = len(d.age.values)
+    print("Ages = ", np.exp(mcmc_result[3+N:3+2*N]))
 
     print("Plotting results and traces...")
-    plot_gyro_result(mcmc_result)
+    plot_gyro_result(d, mcmc_result)
