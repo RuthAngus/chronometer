@@ -29,30 +29,30 @@ plotpar = {'axes.labelsize': 18,
 plt.rcParams.update(plotpar)
 
 
-def gc_lnlike(params, period, period_errs, bv, bv_errs, all_params=False):
+def gc_lnlike(params, period, period_errs, bv, bv_errs):
     """
     Probability of age and model parameters given rotation period and colour.
     parameters:
     ----------
     params: (array)
         The array of log parameters: a, b, n, age.
-    period: (tuple)
-        The rotation period and period uncertainty in days
-    bv: (tuple)
-        The B-V colour and colour uncertainty.
+    period: (array)
+        The rotation period in days.
+    period_errs: (array)
+        The period uncertainty.
+    bv: (array)
+        The B-V colour.
+    bv_errs: (array)
+        The colour uncertainty.
     """
-    if all_params:
-        N = int((len(params) - 3)/5)
-        pars = params[:3]
-        ln_ages = params[3:3+N]
-    else:
-        pars = params[:3]
-        ln_ages = params[3:]
+    N = int((len(params) - 3)/5)
+    pars = params[:3]
+    ln_ages = params[3+N:3+2*N]
     model_periods = gc_model(pars, ln_ages, bv)
     return sum(-.5*((period - model_periods)/period_errs)**2)
 
 
-def iso_lnlike(lnparams, mods, all_params=False):
+def iso_lnlike(lnparams, mods):
     """
     Some isochronal likelihood function.
     parameters:
@@ -60,13 +60,10 @@ def iso_lnlike(lnparams, mods, all_params=False):
     params: (array)
         The array of parameters: log(mass), log(age in Gyr), metallicity,
         log(distance), extinction.
-    mod: (object)
-        An isochrones.py starmodel object.
+    mods: (list)
+        A list of isochrones.py starmodel objects.
     """
-    if all_params:
-        p = lnparams[3:]*1
-    else:
-        p = lnparams*1
+    p = lnparams[3:]*1
     N = int(len(p)/5)
 
     # Transform to linear space
@@ -101,7 +98,7 @@ def lnprior(params):
     # Av_prior = sum([np.log(priors.AV_prior(Av[i])) for i in Av])
     g_prior = priors.lng_prior(params[:3])
     m = (-20 < params) * (params < 20)  # Broad bounds on all params.
-    mAv = (0 < Av) * (Av < 1)
+    mAv = (0 <= Av) * (Av < 1)
     if sum(m) == len(m) and sum(mAv) == len(mAv):
         return age_prior + feh_prior + distance_prior + g_prior #+ Av_prior
     else:
@@ -113,14 +110,15 @@ def lnprob(params, *args):
     The joint log-probability of age given gyro and iso parameters.
     params: (array)
         The parameter array.
-    mod: (list)
+    *args:
+        mods: (list)
         list of pre-computed star model objects.
+        period, period_err, bv, bv_errs
     """
 
     mods, period, period_errs, bv, bv_errs = args
-    return gc_lnlike(params, period, period_errs, bv, bv_errs,
-                        all_params=True) + \
-        iso_lnlike(params, mods, all_params=True) + lnprior(params)
+    return gc_lnlike(params, period, period_errs, bv, bv_errs) + \
+        iso_lnlike(params, mods) + lnprior(params)
 
 
 def plot_gyro_result(d, mcmc_result):
@@ -173,6 +171,8 @@ if __name__ == "__main__":
     d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
 
     p0 = get_inits(d)
+    assert np.isfinite(lnprior(p0))
+
     mods = get_mod_list(d)
     args = [mods, d.period.values, d.period_err.values, d.bv.values,
             d.bv_err.values]
