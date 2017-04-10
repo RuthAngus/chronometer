@@ -172,24 +172,21 @@ def plot_gyro_result(flat, i, g):
     xs = np.linspace(.1, 6, 100)
     result = [np.median(flat[:, 0]), np.median(flat[:, 1]),
               np.median(flat[:, 2])]
-    if i:
-        age_results = np.exp(np.array([np.median(flat[:, 5]),
-                                    np.median(flat[:, 6]),
-                                    np.median(flat[:, 7])]))
-    else:
-        age_results = np.exp(np.array([np.median(flat[:, 3]),
-                                       np.median(flat[:, 4]),
-                                       np.median(flat[:, 5])]))
+
+    age_results = np.exp(np.array([np.median(flat[:, 6]),
+                                   np.median(flat[:, 7]),
+                                   np.median(flat[:, 8])]))
+
     ps0 = gc_model(params_init[:3], np.log(xs), .65)
     ps1 = gc_model(result, np.log(xs), .65)
     plt.clf()
     plt.plot(d.age.values, d.period.values, "k.", ms=20)
     plt.plot(age_results, d.period.values, "m.", ms=20)
-    plt.plot(xs, ps0, label="Before")
-    plt.plot(xs, ps1, label="After")
+    plt.plot(xs, ps0, label="$\mathrm{Before}$")
+    plt.plot(xs, ps1, label="$\mathrm{After}$")
     plt.legend()
-    plt.xlabel("Age (Gyr)")
-    plt.ylabel("Period (days)")
+    plt.xlabel("$\mathrm{Age~(Gyr)}$")
+    plt.ylabel("$\mathrm{Period~(days)}$")
     plt.savefig("period_age_data")
 
 
@@ -281,10 +278,12 @@ if __name__ == "__main__":
     end = time.time()
     print("Time taken = ", (end - start)/60., "mins")
 
+    print("Making corner plot")
     flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
     fig = corner.corner(flat, labels=labels, truths=truths)
     fig.savefig("corner_test")
 
+    print("Plotting results and traces")
     plot_gyro_result(flat, i, g)
 
     # Plot probability
