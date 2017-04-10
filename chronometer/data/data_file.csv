@@ -1,0 +1,4 @@
+age,age_err,bv,bv_err,period,period_err,v,v_err,ks,ks_err,vk,vk_err,j,j_err,h,h_err,k,k_err,parallax,parallax_err,Teff,Teff_err,logg,logg_err,feh,feh_err,mass,mass_err,Av,Av_err
+4.567,.01,.65,.01,26.,2.,,,,,,,3.711,.01,3.452,.01,3.357,.01,100.,1.,5700,100,4.45,.01,0.,.1,1.,.1,0.,.1
+.1,.01,,,0.059,.0001,12.75,.1,5.10,.1,0.5749,.1,,,,,,,7.34,.1,,,,,,,,,,
+.1, .01,,,5.7660,.1,11.36,.1,9.43,.1,1.82,.01,,,,,,,7.34,.1,,,,,,,,,,,
