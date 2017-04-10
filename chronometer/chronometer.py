@@ -170,6 +170,17 @@ def lnprob(params, *args):
 
 
 def replace_NaNs_with_inits(data):
+    """
+    Turn the data into reasonable initial values.
+    params:
+    ------
+    data: (pandas.DataFrame)
+        Data read from an input file - the colours and physical parameters of
+        the stars.
+    If no initial mass is provided, initialise with 1 solar mass.
+    If no initial feh is provided, initialise with solar feh.
+    If no initial Av is provided, initialise with 0.
+    """
     data.mass.values[~np.isfinite(data.mass.values)] \
         = np.ones(len(data.mass.values[~np.isfinite(data.mass.values)]))
     data.feh.values[~np.isfinite(data.feh.values)] \
@@ -184,11 +195,26 @@ def replace_NaNs_with_inits(data):
 
 def vk2teff(vk):
     """
+    Convert V-K to Teff.
     From https://arxiv.org/pdf/astro-ph/9911367.pdf
     For 0.82 < VK < 3.29
     """
     a, b, c = 8686.22, -2441.65, 334.789
     return a + b*vk + c*vk**2
+
+
+def make_param_dict(d, i):
+    param_dict = {"V": (d.v.values[i], d.v_err.values[i]),
+                  "Ks": (d.ks.values[i], d.ks_err.values[i]),
+                  "J": (d.j.values[i], d.j_err.values[i]),
+                  "H": (d.h.values[i], d.h_err.values[i]),
+                  "K": (d.k.values[i], d.k_err.values[i]),
+                  "Teff": (d.Teff.values[i], d.Teff_err.values[i]),
+                  "logg": (d.logg.values[i], d.logg_err.values[i]),
+                  "feh": (d.feh.values[i], d.feh_err.values[i]),
+                  "parallax": (d.parallax.values[i],
+                               d.parallax_err.values[i])}
+    return param_dict
 
 
 if __name__ == "__main__":
@@ -210,19 +236,9 @@ if __name__ == "__main__":
     mist = MIST_Isochrone()
     mods = []
     for i in range(len(d.period.values)):
-        param_dict = {"V": (d.v.values[i], d.v_err.values[i]),
-                      "Ks": (d.ks.values[i], d.ks_err.values[i]),
-                      "J": (d.j.values[i], d.j_err.values[i]),
-                      "H": (d.h.values[i], d.h_err.values[i]),
-                      "K": (d.k.values[i], d.k_err.values[i]),
-                      "Teff": (d.Teff.values[i], d.Teff_err.values[i]),
-                      "logg": (d.logg.values[i], d.logg_err.values[i]),
-                      "feh": (d.feh.values[i], d.feh_err.values[i]),
-                      "parallax": (d.parallax.values[i],
-                                   d.parallax_err.values[i])}
+        param_dict = make_param_dict(d, i)
 
-        # Remove empty values.
-        # print(param_dict)
+        # Remove missing parameters from the dict.
         param_dict = {k: param_dict[k] for k in param_dict if
                       np.isfinite(param_dict[k]).all()}
         mods.append(StarModel(mist, **param_dict))
@@ -230,45 +246,43 @@ if __name__ == "__main__":
     start = time.time()
 
     # Run emcee and plot corner
-    i, g = True, True
+    i, g = False, True
 
     if g:  # Convert V-K to B-V
-        bv = d.bv.values*1
-        m = np.isfinite(bv)
+        m = np.isfinite(d.bv.values)
         teff = vk2teff(d.vk.values[~m])
         new_bv = tbv.teff2bv(teff, 4.44, 0)
-        bv[~m] = new_bv
-        d.bv = bv
-        bv_err = d.bv_err.values*1
-        bv_err[~m] = np.ones(len(bv[~m])) * .01
-        d.bv_err = bv_err
+        d.bv.values[~m] = new_bv
+        d.bv_err.values[~m] = np.ones(len(d.bv.values[~m])) * .01
 
     if g and i:
         print("gyro and iso")
         args = [mods, d.period.values, d.period_err.values, d.bv.values,
                 d.bv_err.values]
-        truths = [.7725, .601, .5189, np.log(1), np.log(1), np.log(4.56),
-                  np.log(.5), 0., 0., np.log(10), np.log(10), 0., 0.]
-        labels = ["$a$", "$b$", "$n$", "$\ln(Age_1)$", "$\ln(Age_2)$",
-                  "$\ln(Mass_1)$", "$\ln(Mass_2)$", "$[Fe/H]_1$",
-                  "$[Fe/H]_2$", "$\ln(D_1)$", "$\ln(D_2)$", "$A_v1$",
-                  "$A_v2$"]
+        truths = [.7725, .601, .5189, np.log(1), None, np.log(4.56),
+                  np.log(2.5), 0., None, np.log(10), np.log(2400), 0., None]
+        labels = ["$a$", "$b$", "$n$", "$\ln(Mass_1)$", "$\ln(Mass_2)$",
+                  "$\ln(Age_1)$", "$\ln(Age_2)$", "$[Fe/H]_1$",
+                  "$[Fe/H]_2$", "$\ln(D_1)$", "$\ln(D_2)$", "$A_{v1}$",
+                  "$A_{v2}$"]
     if g and not i:  # If gyro inference
         print("gyro")
-        p0 = np.concatenate((p0[:3], p0[5:7]))
+        N = len(d.age.values)
+        p0 = np.concatenate((p0[:3], p0[3+N:3+2*N]))
         args = [d.period.values, d.period_err.values, d.bv.values,
                 d.bv_err.values]
-        truths = [.7725, .601, .5189, np.log(4.56), np.log(.5)]
-        labels = ["$a$", "$b$", "$n$", "$\ln(Age_1)$", "$\ln(Age_2)$"]
+        truths = [.7725, .601, .5189, np.log(4.56), np.log(2.5), np.log(2.5)]
+        labels = ["$a$", "$b$", "$n$", "$\ln(Age_1)$", "$\ln(Age_2)$",
+                  "$\ln(Age_2)$"]
     elif i and not g:  # If Iso inference.
         print("iso")
         p0 = p0[3:]
         args = [mods]
-        truths = [np.log(4.56), np.log(.5), np.log(1), np.log(1), 0., 0.,
-                np.log(10), np.log(10), 0., 0.]
-        labels = ["$\ln(Age_1)$", "$\ln(Age_2)$", "$\ln(Mass_1)$",
-                "$\ln(Mass_2)$", "$[Fe/H]_1$", "$[Fe/H]_2$", "$\ln(D_1)$",
-                "$\ln(D_2)$", "$A_v1$", "$A_v2$"]
+        truths = [np.log(1), None, np.log(4.56), np.log(2.5), 0., None,
+                np.log(10), np.log(2400), 0., None]
+        labels = ["$\ln(Mass_1)$", "$\ln(Mass_2)$", "$\ln(Age_1)$",
+                  "$\ln(Age_2)$", "$[Fe/H]_1$", "$[Fe/H]_2$", "$\ln(D_1)$",
+                  "$\ln(D_2)$", "$A_{v1}$", "$A_{v2}$"]
 
     print("p0 = ", p0)
     nwalkers, nsteps, ndim = 64, 10000, len(p0)
@@ -293,15 +307,15 @@ if __name__ == "__main__":
               np.median(flat[:, 2])]
     age_results = np.exp(np.array([np.median(flat[:, 5]),
                                    np.median(flat[:, 6])]))
-    print(params_init)
-    print(params_init[:3])
+
     ps0 = gc_model(params_init[:3], np.log(xs), .65)
     ps1 = gc_model(result, np.log(xs), .65)
     plt.clf()
     plt.plot(d.age.values, d.period.values, "k.", ms=20)
-    plt.plot(age_results, d.period.values, "b.", ms=20)
+    plt.plot(age_results, d.period.values, "m.", ms=20)
     plt.plot(xs, ps0, label="Before")
     plt.plot(xs, ps1, label="After")
+    plt.legend()
     plt.xlabel("Age (Gyr)")
     plt.ylabel("Period (days)")
     plt.savefig("period_age_data")
