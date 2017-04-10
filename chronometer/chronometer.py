@@ -79,34 +79,6 @@ def iso_lnlike(lnparams, mods, all_params=False):
     return sum(ll)
 
 
-def gyro_lnprior(params):
-    m = (-10 < params) * (params < 10)  # Broad bounds on all params.
-    if sum(m) == len(m):
-        return priors.lng_prior(params[:3])
-    else:
-        return -np.inf
-
-
-def iso_lnprior(params):
-    N = int(len(params)/5)  # number of stars
-    ln_mass = params[:N]  # parameter assignment
-    ln_age = params[N:2*N]
-    feh = params[2*N:3*N]
-    distance = params[3*N:4*N]
-    Av = params[4*N:5*N]
-    age_prior = sum([np.log(priors.age_prior(np.log10(1e9*np.exp(i))))
-                     for i in ln_age])
-    feh_prior = sum([np.log(priors.feh_prior(i)) for i in feh])
-    distance_prior = sum([np.log(priors.distance_prior(np.exp(i))) for i
-                          in distance])
-    m = (-20 < params) * (params < 20)
-    mAv = (0 < Av) * (Av < 1)
-    if sum(m) == len(m) and sum(mAv) == len(mAv):
-        return age_prior + feh_prior + distance_prior # + Av_prior
-    else:
-        return -np.inf
-
-
 def lnprior(params):
     """
     lnprior on the parameters when both iso and gyro parameters are being
@@ -145,40 +117,20 @@ def lnprob(params, *args):
         list of pre-computed star model objects.
     """
 
-    # Figure out whether the iso or gyro or both likelihoods should be called.
-    if args[-1] == "gyro":
-        iso, gyro = False, True
-    elif args[-1] == "iso":
-        iso, gyro = True, False
-    elif args[-1] == "both":
-        iso, gyro = True, True
-
-    if iso and gyro:
-        mods, period, period_errs, bv, bv_errs, _ = args
-        return gc_lnlike(params, period, period_errs, bv, bv_errs,
-                         all_params=True) + \
-            iso_lnlike(params, mods, all_params=True) + lnprior(params)
-    elif gyro:
-        period, period_errs, bv, bv_errs, _ = args
-        return gc_lnlike(params, period, period_errs, bv, bv_errs) + \
-            gyro_lnprior(params)
-    elif iso:
-        mods, _ = args
-        return iso_lnlike(params, mods) + iso_lnprior(params)
+    mods, period, period_errs, bv, bv_errs = args
+    return gc_lnlike(params, period, period_errs, bv, bv_errs,
+                        all_params=True) + \
+        iso_lnlike(params, mods, all_params=True) + lnprior(params)
 
 
-def plot_gyro_result(flat, i, g):
+def plot_gyro_result(d, mcmc_result):
     # Plot the gyro result
     xs = np.linspace(.1, 6, 100)
-    result = [np.median(flat[:, 0]), np.median(flat[:, 1]),
-              np.median(flat[:, 2])]
+    ps0 = gc_model(mcmc_result[:3], np.log(xs), .65)
+    ps1 = gc_model(mcmc_result[:3], np.log(xs), .65)
+    N = len(d.age.values)
+    age_results = mcmc_result[3+N:3+2*N]
 
-    age_results = np.exp(np.array([np.median(flat[:, 6]),
-                                   np.median(flat[:, 7]),
-                                   np.median(flat[:, 8])]))
-
-    ps0 = gc_model(params_init[:3], np.log(xs), .65)
-    ps1 = gc_model(result, np.log(xs), .65)
     plt.clf()
     plt.plot(d.age.values, d.period.values, "k.", ms=20)
     plt.plot(age_results, d.period.values, "m.", ms=20)
@@ -190,64 +142,18 @@ def plot_gyro_result(flat, i, g):
     plt.savefig("period_age_data")
 
 
-def assign_args(p0, mods, d, i, g):
-    if g:  # Convert V-K to B-V
-        m = np.isfinite(d.bv.values)
-        teff = vk2teff(d.vk.values[~m])
-        new_bv = tbv.teff2bv(teff, 4.44, 0)
-        d.bv.values[~m] = new_bv
-        d.bv_err.values[~m] = np.ones(len(d.bv.values[~m])) * .01
-    if g and i:
-        print("gyro and iso")
-        args = [mods, d.period.values, d.period_err.values, d.bv.values,
-                d.bv_err.values, "both"]
-        truths = [.7725, .601, .5189, np.log(1), None, None, np.log(4.56),
-                  np.log(2.5), np.log(2.5), 0., None, None, np.log(10),
-                  np.log(2400), np.log(2400), 0., None, None]
-        labels = ["$a$", "$b$", "$n$", "$\ln(Mass_1)$", "$\ln(Mass_2)$",
-                  "$\ln(Mass_3)$", "$\ln(Age_1)$", "$\ln(Age_2)$",
-                  "$\ln(Age_3)$", "$[Fe/H]_1$", "$[Fe/H]_2$", "$[Fe/H]_3$",
-                  "$\ln(D_1)$", "$\ln(D_2)$", "$\ln(D_3)$", "$A_{v1}$",
-                  "$A_{v2}$", "$A_{v3}$"]
-    if g and not i:  # If gyro inference
-        print("gyro")
-        N = len(d.age.values)
-        p0 = np.concatenate((p0[:3], p0[3+N:3+2*N]))
-        args = [d.period.values, d.period_err.values, d.bv.values,
-                d.bv_err.values, "gyro"]
-        truths = [.7725, .601, .5189, np.log(4.56), np.log(2.5), np.log(2.5)]
-        labels = ["$a$", "$b$", "$n$", "$\ln(Age_1)$", "$\ln(Age_2)$",
-                  "$\ln(Age_3)$"]
-    elif i and not g:  # If Iso inference.
-        print("iso")
-        p0 = p0[3:]
-        args = [mods, "iso"]
-        truths = [np.log(1), None, None, np.log(4.56), np.log(2.5),
-                  np.log(2.5), 0., None, None, np.log(10), np.log(2400),
-                  np.log(2400), 0., None, None]
-        labels = ["$\ln(Mass_1)$", "$\ln(Mass_2)$", "$\ln(Mass_3)$",
-                  "$\ln(Age_1)$", "$\ln(Age_2)$", "$\ln(Age_3)$",
-                  "$[Fe/H]_1$", "$[Fe/H]_2$", "$[Fe/H]_3$", "$\ln(D_1)$",
-                  "$\ln(D_2)$", "$\ln(D_3)$", "$A_{v1}$", "$A_{v2}$",
-                  "$A_{v3}$"]
-    return p0, args, truths, labels
-
-
-if __name__ == "__main__":
-
-    DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
-
+def get_inits(d):
     # The parameters
     gc = np.array([.7725, .601, .5189])
-    d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
-
     d = replace_nans_with_inits(d)
     p0 = np.concatenate((gc, np.log(d.mass.values),
                          np.log(d.age.values), d.feh.values,
                          np.log(1./d.parallax.values*1e3),
                          d.Av.values))
-    params_init = p0*1
+    return p0
 
+
+def get_mod_list(d):
     # iso_lnlike preamble - make a list of 'mod' objects: one for each star.
     mist = MIST_Isochrone()
     mods = []
@@ -258,12 +164,20 @@ if __name__ == "__main__":
         param_dict = {k: param_dict[k] for k in param_dict if
                       np.isfinite(param_dict[k]).all()}
         mods.append(StarModel(mist, **param_dict))
+    return mods
+
+
+if __name__ == "__main__":
+
+    DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
+    d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
+
+    p0 = get_inits(d)
+    mods = get_mod_list(d)
+    args = [mods, d.period.values, d.period_err.values, d.bv.values,
+            d.bv_err.values]
 
     start = time.time()  # timeit
-
-    # Iso or gyro or both? Assign args, etc.
-    i, g = True, True
-    p0, args, truths, labels = assign_args(p0, mods, d, i, g)
 
     # Run emcee and plot corner
     print("p0 = ", p0)
@@ -278,21 +192,9 @@ if __name__ == "__main__":
     end = time.time()
     print("Time taken = ", (end - start)/60., "mins")
 
-    print("Making corner plot")
-    flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
-    fig = corner.corner(flat, labels=labels, truths=truths)
-    fig.savefig("corner_test")
+    mcmc_result = map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
+                    zip(*np.percentile(flatchain, [16, 50, 84], axis=0)))
+    print(mcmc_result)
 
-    print("Plotting results and traces")
-    plot_gyro_result(flat, i, g)
-
-    # Plot probability
-    plt.clf()
-    plt.plot(sampler.lnprobability.T, "k")
-    plt.savefig("prob_trace")
-
-    # Plot chains
-    for i in range(ndim):
-        plt.clf()
-        plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
-        plt.savefig("{}_trace".format(i))
+    print("Plotting results and traces...")
+    plot_gyro_result(mcmc_result)
