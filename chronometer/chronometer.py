@@ -88,18 +88,19 @@ def gyro_lnprior(params):
 
 def iso_lnprior(params):
     N = int(len(params)/5)  # number of stars
-    ln_age = params[N:2*N]  # parameter assignment
-    ln_mass = params[2*N:3*N]
-    feh = params[3*N:4*N]
-    d = params[4*N:5*N]
-    Av = params[5*N:6*N]
+    ln_mass = params[:N]  # parameter assignment
+    ln_age = params[N:2*N]
+    feh = params[2*N:3*N]
+    distance = params[3*N:4*N]
+    Av = params[4*N:5*N]
     age_prior = sum([np.log(priors.age_prior(np.log10(1e9*np.exp(i))))
                      for i in ln_age])
     feh_prior = sum([np.log(priors.feh_prior(i)) for i in feh])
     distance_prior = sum([np.log(priors.distance_prior(np.exp(i))) for i
-                          in d])
-    Av_prior = sum([np.log(priors.AV_prior(Av[i])) for i in Av])
-    m = (-10 < params) * (params < 10)  # Broad bounds on all params.
+                          in distance])
+    if Av.any() < 0. or 1. < Av.any():
+        Av_prior = -np.inf
+    m = (-20 < params) * (params < 20)  # Broad bounds on all params.
     if sum(m) == len(m):
         return age_prior + feh_prior + distance_prior + Av_prior
     else:
@@ -113,19 +114,21 @@ def lnprior(params):
     """
     # Parameter assignment
     N = int(len(params[3:])/5)  # number of stars
-    ln_age = params[3+N:3+2*N]  # parameter assignment
-    ln_mass = params[3+2*N:3+3*N]
-    feh = params[3+3*N:3+4*N]
-    d = params[3+4*N:3+5*N]
-    Av = params[3+5*N:3+6*N]
+    ln_mass = params[3:3+N]  # parameter assignment
+    ln_age = params[3+N:3+2*N]
+    feh = params[3+2*N:3+3*N]
+    distance = params[3+3*N:3+4*N]
+    Av = params[3+4*N:3+5*N]
 
     # Calculate priors from Tim's isochrones.py
     age_prior = sum([np.log(priors.age_prior(np.log10(1e9*np.exp(i))))
                      for i in ln_age])
     feh_prior = sum([np.log(priors.feh_prior(i)) for i in feh])
     distance_prior = sum([np.log(priors.distance_prior(np.exp(i))) for i
-                          in d])
+                          in distance])
     Av_prior = sum([np.log(priors.AV_prior(Av[i])) for i in Av])
+    # if Av.any() < 0. or 1. < Av.any():
+    #     Av_prior = -np.inf
     g_prior = priors.lng_prior(params[:3])
     m = (-20 < params) * (params < 20)  # Broad bounds on all params.
     if sum(m) == len(m):
@@ -162,10 +165,11 @@ def lnprob(params, *args):
             gyro_lnprior(params)
     elif iso:
         mods, _ = args
-        return iso_lnlike(params, mods) + iso_lnprior(params)
+        return iso_lnprior(params)
+        # return iso_lnlike(params, mods) + iso_lnprior(params)
 
 
-def replace_NaNs_with_inits(data):
+def replace_nans_with_inits(data):
     """
     Turn the data into reasonable initial values.
     params:
@@ -221,7 +225,7 @@ if __name__ == "__main__":
     gc = np.array([.7725, .601, .5189])
     d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
 
-    d = replace_NaNs_with_inits(d)
+    d = replace_nans_with_inits(d)
     p0 = np.concatenate((gc, np.log(d.mass.values),
                          np.log(d.age.values), d.feh.values,
                          np.log(1./d.parallax.values*1e3),
@@ -242,7 +246,7 @@ if __name__ == "__main__":
     start = time.time()
 
     # Run emcee and plot corner
-    i, g = False, True
+    i, g = True, False
 
     if g:  # Convert V-K to B-V
         m = np.isfinite(d.bv.values)
@@ -255,12 +259,14 @@ if __name__ == "__main__":
         print("gyro and iso")
         args = [mods, d.period.values, d.period_err.values, d.bv.values,
                 d.bv_err.values, "both"]
-        truths = [.7725, .601, .5189, np.log(1), None, np.log(4.56),
-                  np.log(2.5), 0., None, np.log(10), np.log(2400), 0., None]
+        truths = [.7725, .601, .5189, np.log(1), None, None, np.log(4.56),
+                  np.log(2.5), np.log(2.5), 0., None, None, np.log(10),
+                  np.log(2400), np.log(2400), 0., None, None]
         labels = ["$a$", "$b$", "$n$", "$\ln(Mass_1)$", "$\ln(Mass_2)$",
-                  "$\ln(Age_1)$", "$\ln(Age_2)$", "$[Fe/H]_1$",
-                  "$[Fe/H]_2$", "$\ln(D_1)$", "$\ln(D_2)$", "$A_{v1}$",
-                  "$A_{v2}$"]
+                  "$\ln(Mass_3)$", "$\ln(Age_1)$", "$\ln(Age_2)$",
+                  "$\ln(Age_3)$", "$[Fe/H]_1$", "$[Fe/H]_2$", "$[Fe/H]_3$",
+                  "$\ln(D_1)$", "$\ln(D_2)$", "$\ln(D_3)$", "$A_{v1}$",
+                  "$A_{v2}$", "$A_{v3}$"]
     if g and not i:  # If gyro inference
         print("gyro")
         N = len(d.age.values)
@@ -269,16 +275,19 @@ if __name__ == "__main__":
                 d.bv_err.values, "gyro"]
         truths = [.7725, .601, .5189, np.log(4.56), np.log(2.5), np.log(2.5)]
         labels = ["$a$", "$b$", "$n$", "$\ln(Age_1)$", "$\ln(Age_2)$",
-                  "$\ln(Age_2)$"]
+                  "$\ln(Age_3)$"]
     elif i and not g:  # If Iso inference.
         print("iso")
         p0 = p0[3:]
         args = [mods, "iso"]
-        truths = [np.log(1), None, np.log(4.56), np.log(2.5), 0., None,
-                np.log(10), np.log(2400), 0., None]
-        labels = ["$\ln(Mass_1)$", "$\ln(Mass_2)$", "$\ln(Age_1)$",
-                  "$\ln(Age_2)$", "$[Fe/H]_1$", "$[Fe/H]_2$", "$\ln(D_1)$",
-                  "$\ln(D_2)$", "$A_{v1}$", "$A_{v2}$"]
+        truths = [np.log(1), None, None, np.log(4.56), np.log(2.5),
+                  np.log(2.5), 0., None, None, np.log(10), np.log(2400),
+                  np.log(2400), 0., None, None]
+        labels = ["$\ln(Mass_1)$", "$\ln(Mass_2)$", "$\ln(Mass_3)$",
+                  "$\ln(Age_1)$", "$\ln(Age_2)$", "$\ln(Age_3)$",
+                  "$[Fe/H]_1$", "$[Fe/H]_2$", "$[Fe/H]_3$", "$\ln(D_1)$",
+                  "$\ln(D_2)$", "$\ln(D_3)$", "$A_{v1}$", "$A_{v2}$",
+                  "$A_{v3}$"]
 
     print("p0 = ", p0)
     nwalkers, nsteps, ndim = 64, 10000, len(p0)
@@ -301,8 +310,14 @@ if __name__ == "__main__":
     xs = np.linspace(.1, 6, 100)
     result = [np.median(flat[:, 0]), np.median(flat[:, 1]),
               np.median(flat[:, 2])]
-    age_results = np.exp(np.array([np.median(flat[:, 5]),
-                                   np.median(flat[:, 6])]))
+    if i:
+        age_results = np.exp(np.array([np.median(flat[:, 5]),
+                                    np.median(flat[:, 6]),
+                                    np.median(flat[:, 7])]))
+    else:
+        age_results = np.exp(np.array([np.median(flat[:, 3]),
+                                       np.median(flat[:, 4]),
+                                       np.median(flat[:, 5])]))
 
     ps0 = gc_model(params_init[:3], np.log(xs), .65)
     ps1 = gc_model(result, np.log(xs), .65)
