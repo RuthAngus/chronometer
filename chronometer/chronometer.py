@@ -144,28 +144,24 @@ def lnprob(params, *args):
     """
 
     # Figure out whether the iso or gyro or both likelihoods should be called.
-    if len(params) < 6:
-        iso, gyro = False, True  # GYRO
-    elif len(params) % 5 == 0:
-        iso, gyro = True, False  # ISO
-    else:
+    if args[-1] == "gyro":
+        iso, gyro = False, True
+    elif args[-1] == "iso":
+        iso, gyro = True, False
+    elif args[-1] == "both":
         iso, gyro = True, True
 
     if iso and gyro:
-        mods, period, period_errs, bv, bv_errs = args
-        # print(gc_lnlike(params, period, period_errs, bv, bv_errs,
-        #                  all_params=True),
-        #       iso_lnlike(params, mods, all_params=True), lnprior(params))
-        # assert 0
+        mods, period, period_errs, bv, bv_errs, _ = args
         return gc_lnlike(params, period, period_errs, bv, bv_errs,
                          all_params=True) + \
             iso_lnlike(params, mods, all_params=True) + lnprior(params)
     elif gyro:
-        period, period_errs, bv, bv_errs = args
+        period, period_errs, bv, bv_errs, _ = args
         return gc_lnlike(params, period, period_errs, bv, bv_errs) + \
             gyro_lnprior(params)
     elif iso:
-        mods = args[0]
+        mods, _ = args
         return iso_lnlike(params, mods) + iso_lnprior(params)
 
 
@@ -258,7 +254,7 @@ if __name__ == "__main__":
     if g and i:
         print("gyro and iso")
         args = [mods, d.period.values, d.period_err.values, d.bv.values,
-                d.bv_err.values]
+                d.bv_err.values, "both"]
         truths = [.7725, .601, .5189, np.log(1), None, np.log(4.56),
                   np.log(2.5), 0., None, np.log(10), np.log(2400), 0., None]
         labels = ["$a$", "$b$", "$n$", "$\ln(Mass_1)$", "$\ln(Mass_2)$",
@@ -270,14 +266,14 @@ if __name__ == "__main__":
         N = len(d.age.values)
         p0 = np.concatenate((p0[:3], p0[3+N:3+2*N]))
         args = [d.period.values, d.period_err.values, d.bv.values,
-                d.bv_err.values]
+                d.bv_err.values, "gyro"]
         truths = [.7725, .601, .5189, np.log(4.56), np.log(2.5), np.log(2.5)]
         labels = ["$a$", "$b$", "$n$", "$\ln(Age_1)$", "$\ln(Age_2)$",
                   "$\ln(Age_2)$"]
     elif i and not g:  # If Iso inference.
         print("iso")
         p0 = p0[3:]
-        args = [mods]
+        args = [mods, "iso"]
         truths = [np.log(1), None, np.log(4.56), np.log(2.5), 0., None,
                 np.log(10), np.log(2400), 0., None]
         labels = ["$\ln(Mass_1)$", "$\ln(Mass_2)$", "$\ln(Age_1)$",
