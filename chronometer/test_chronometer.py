@@ -16,23 +16,10 @@ class ChronometerTestCase(unittest.TestCase):
     """
     Tests for chronometer.py
     """
-
-    def test_lnprior_returns_finite(self):
-        """
-        Make sure lnprior returns a finite number.
-        """
-        gc = np.array([.7725, .601, .5189])
-        ages = np.array([4.56, .5])
-        masses = np.array([1., 1.])
-        fehs = np.array([0., 0.])
-        ds = np.array([10., 10.])
-        Avs = np.array([0., 0.])
-        p0 = np.concatenate((gc, np.log(masses), np.log(ages), fehs,
-                             np.log(ds), Avs))
-
-        print(lnprior(p0))
-        b = np.isfinite(lnprior(p0))
-        self.assertTrue(b)
+    DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
+    self.d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
+    self.p0 = get_inits(d)
+    self.mods = get_mod_list(d)
 
     def test_data_file_validity(self):
         """
@@ -42,8 +29,6 @@ class ChronometerTestCase(unittest.TestCase):
         j,j_err,h,h_err,k,k_err,parallax,parallax_err,Teff,Teff_err,logg,
         logg_err,feh,feh_err,mass,mass_err,Av,Av_err
         """
-        DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
-        d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
         bounds = [[0, 13.7], [0, 10], [0, 200], [0, 100], [-10, 10], [0, 10],
                   [0, 30], [0, 10], [0, 30], [0, 10], [0, 30], [0, 10],
                   [0, 30], [0, 10], [0, 30], [0, 10], [0, 30], [0, 10],
@@ -53,18 +38,30 @@ class ChronometerTestCase(unittest.TestCase):
 
         b = True
         for i, bound in enumerate(bounds):
-            b += (bound[0] < d.iloc[:, i][np.isfinite(d.iloc[:, i])]) & \
-                (d.iloc[:, i][np.isfinite(d.iloc[:, i])] < bound[1])
+            b += (bound[0] < \
+                  self.d.iloc[:, i][np.isfinite(self.d.iloc[:, i])]) & \
+                (self.d.iloc[:, i][np.isfinite(self.d.iloc[:, i])] <
+                 bound[1])
         self.assertTrue(b.all())
 
     def test_lnprobs(self):
-        DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
-        d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
-        p0 = get_inits(d)
-        mods = get_mod_list(d)
-        args = [mods, d.period.values, d.period_err.values, d.bv.values,
-                d.bv_err.values]
+        """
+        Make sure lnprob returns finite.
+        """
+        args = [self.mods, self.d.period.values, self.d.period_err.values,
+                self.d.bv.values, self.d.bv_err.values]
         self.assertTrue(np.isfinite((lnprob(p0, *args))))
+
+    def test_lnprior(self):
+        """
+        Make sure lnprior returns a finite number.
+        """
+        self.assertTrue(np.isfinite(lnprior(self.p0)))
+
+    def test_gc_lnlike(self):
+        params = np.array([.7725, .601, .5189, 0., np.log(4.56), 0., 100.,
+                           0.])
+        print(gc_lnlike(params. 26, 1., .65, ,.01))
 
 
 if __name__ == "__main__":

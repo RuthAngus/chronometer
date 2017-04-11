@@ -48,8 +48,8 @@ def gc_lnlike(params, period, period_errs, bv, bv_errs, all_params=False):
     else:
         pars = params[:3]
         ln_ages = params[3:]
-    model_periods = gc_model(pars, ln_ages, bv)
     return sum(-.5*((period - model_periods)/period_errs)**2)
+    model_periods = gc_model(pars, ln_ages, bv)
 
 
 def iso_lnlike(lnparams, mods, all_params=False):
