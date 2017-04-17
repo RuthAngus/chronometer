@@ -167,7 +167,7 @@ def lnprob(params, *args):
         return iso_lnlike(params, mods) + iso_lnprior(params)
 
 
-def plot_gyro_result(flat, i, g):
+def plot_gyro_result(flat, params_init, i, g):
     # Plot the gyro result
     xs = np.linspace(.1, 6, 100)
     result = [np.median(flat[:, 0]), np.median(flat[:, 1]),
@@ -233,11 +233,8 @@ def assign_args(p0, mods, d, i, g):
     return p0, args, truths, labels
 
 
-if __name__ == "__main__":
-
-    DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
-
-    # The parameters
+def pars_and_mods():
+    # The initial parameters
     gc = np.array([.7725, .601, .5189])
     d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
 
@@ -246,7 +243,6 @@ if __name__ == "__main__":
                          np.log(d.age.values), d.feh.values,
                          np.log(1./d.parallax.values*1e3),
                          d.Av.values))
-    params_init = p0*1
 
     # iso_lnlike preamble - make a list of 'mod' objects: one for each star.
     mist = MIST_Isochrone()
@@ -258,6 +254,15 @@ if __name__ == "__main__":
         param_dict = {k: param_dict[k] for k in param_dict if
                       np.isfinite(param_dict[k]).all()}
         mods.append(StarModel(mist, **param_dict))
+    return p0, mods
+
+
+if __name__ == "__main__":
+
+    DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
+
+    p0, mods = pars_and_mods()
+    params_init = p0*1
 
     start = time.time()  # timeit
 
@@ -284,7 +289,7 @@ if __name__ == "__main__":
     fig.savefig("corner_working")
 
     print("Plotting results and traces")
-    plot_gyro_result(flat, i, g)
+    plot_gyro_result(flat, params_init, i, g)
 
     # Plot probability
     plt.clf()
