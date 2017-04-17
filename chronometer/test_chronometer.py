@@ -16,10 +16,11 @@ class ChronometerTestCase(unittest.TestCase):
     """
     Tests for chronometer.py
     """
-    DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
-    self.d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
-    self.p0 = get_inits(d)
-    self.mods = get_mod_list(d)
+    def __init__(self):
+        DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
+        self.d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
+        self.p0 = get_inits(d)
+        self.mods = get_mod_list(d)
 
     def test_data_file_validity(self):
         """
@@ -58,10 +59,10 @@ class ChronometerTestCase(unittest.TestCase):
         """
         self.assertTrue(np.isfinite(lnprior(self.p0)))
 
-    def test_gc_lnlike(self):
-        params = np.array([.7725, .601, .5189, 0., np.log(4.56), 0., 100.,
-                           0.])
-        print(gc_lnlike(params. 26, 1., .65, ,.01))
+    # def test_gc_lnlike(self):
+    #     params = np.array([.7725, .601, .5189, 0., np.log(4.56), 0., 100.,
+    #                        0.])
+    #     print(gc_lnlike(params. 26, 1., .65, ,.01))
 
 
 if __name__ == "__main__":
