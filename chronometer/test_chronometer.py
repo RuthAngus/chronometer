@@ -95,7 +95,7 @@ class ChronometerTestCase(unittest.TestCase):
         self.assertTrue(len(lnages) == Nstars)
 
     def test_iso_lnprior_one_star(self):
-        gc.iso_lnprior(one_star_pars)
+        self.assertTrue(np.isfinite(gc.iso_lnprior(np.array(one_star_pars))))
 
 if __name__ == "__main__":
 

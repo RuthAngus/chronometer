@@ -126,7 +126,6 @@ def iso_lnprior(params):
     feh_prior = sum([np.log(priors.feh_prior(i)) for i in feh])
     distance_prior = sum([np.log(priors.distance_prior(np.exp(i))) for i
                           in ln_distance])
-    print(N, ln_mass)
     m = (-20 < params) * (params < 20)
     mAv = (0 <= Av) * (Av < 1)
     if sum(m) == len(m) and sum(mAv) == len(mAv):
@@ -268,9 +267,7 @@ def parameter_assignment(params, indicator):
     Take the parameter array and split it into groups of parameters.
     """
     if indicator == "iso":
-        Nstars = int(len(params)/5.) # number of stars
-        print(Nstars, len(params), len(params)/5., int(len(params)/5.), indicator)
-        input("etner")
+        N = int(len(params)/5.) # number of stars
         ln_mass = params[:N]  # parameter assignment
         ln_age = params[N:2*N]
         feh = params[2*N:3*N]
@@ -289,6 +286,9 @@ def parameter_assignment(params, indicator):
 def emc(p0, args, nwalkers, nsteps, burnin):
     """
     Run emcee for a set of parameters.
+    Try by first running on individual stars, cycle through.
+    Then just run the global parameters, then run all.
+    Use emcee for now.
     """
     print("p0 = ", p0)
     ndim = len(p0)
