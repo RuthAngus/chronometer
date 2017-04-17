@@ -10,6 +10,7 @@ import pandas as pd
 import scipy.misc as spm
 from isochrones import StarModel
 from isochrones.mist import MIST_Isochrone
+import h5py
 
 from simple_gibbs import gibbs
 import emcee
@@ -173,10 +174,9 @@ def plot_gyro_result(flat, i, g):
     result = [np.median(flat[:, 0]), np.median(flat[:, 1]),
               np.median(flat[:, 2])]
 
-    age_results = np.exp(np.array([np.median(flat[:, 7]),
-                                   np.median(flat[:, 8]),
-                                   np.median(flat[:, 9]),
-                                   np.median(flat[:, 10])]))
+    age_results = np.exp(np.array([np.median(flat[:, 6]),
+                                   np.median(flat[:, 7]),
+                                   np.median(flat[:, 8])]))
 
     ps0 = gc_model(params_init[:3], np.log(xs), .65)
     ps1 = gc_model(result, np.log(xs), .65)
@@ -240,7 +240,8 @@ if __name__ == "__main__":
 
     # The parameters
     gc = np.array([.7725, .601, .5189])
-    d = pd.read_csv(os.path.join(DATA_DIR, "data_file_more.csv"))
+    # d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
+    d = pd.read_csv(os.path.join(DATA_DIR, "all_single.csv"))
 
     d = replace_nans_with_inits(d)
     p0 = np.concatenate((gc, np.log(d.mass.values),
@@ -263,16 +264,17 @@ if __name__ == "__main__":
     start = time.time()  # timeit
 
     # Iso or gyro or both? Assign args, etc.
-    i, g = True, True
+    i, g = True, False
+    # i, g = True, True
     p0, args, truths, labels = assign_args(p0, mods, d, i, g)
 
     # Run emcee and plot corner
     print("p0 = ", p0)
-    nwalkers, nsteps, ndim = 64, 5000, len(p0)
+    nwalkers, nsteps, ndim = 64, 10000, len(p0)
     p0 = [1e-4*np.random.rand(ndim) + p0 for i in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=args)
     print("burning in...")
-    pos, _, _ = sampler.run_mcmc(p0, 2000)
+    pos, _, _ = sampler.run_mcmc(p0, 5000)
     sampler.reset()
     print("production run...")
     sampler.run_mcmc(pos, nsteps)
@@ -281,9 +283,16 @@ if __name__ == "__main__":
 
     print("Making corner plot")
     flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
-    # fig = corner.corner(flat, labels=labels, truths=truths)
-    fig = corner.corner(flat)
-    fig.savefig("corner_more")
+    fig = corner.corner(flat, labels=labels, truths=truths)
+    fig.savefig("corner_working")
+
+    RESULTS_DIR = "results"
+    # f = h5py.File(os.path.join(RESULTS_DIR, "gyro_single2.h5"), "w")
+    # f = h5py.File(os.path.join(RESULTS_DIR, "all_spec_single2.h5"), "w")
+    f = h5py.File(os.path.join(RESULTS_DIR, "all_single2.h5"), "w")
+    data = f.create_dataset("samples", np.shape(flat))
+    data[:, :] = flat
+    f.close()
 
     print("Plotting results and traces")
     plot_gyro_result(flat, i, g)

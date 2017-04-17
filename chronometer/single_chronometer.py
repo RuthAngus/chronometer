@@ -143,7 +143,7 @@ def sun_demo(fname, gyro=True, iso=True, plot=False, spec=False):
 
     bands = dict(J=(J, J_err), H=(H, H_err), K=(K, K_err),)
     parallax, period, bv = (1./d*1e3, .01), (26.6098830128, 1.), (.65, .01)
-    Teff, logg, feh = (5700, 100), (4.45, .1), (0., .1)
+    Teff, logg, feh = (5778, 50), (4.43812, .01), (0., .01)
 
     # test the iso_lnlike
     mist = MIST_Isochrone()
@@ -153,11 +153,10 @@ def sun_demo(fname, gyro=True, iso=True, plot=False, spec=False):
         mod = StarModel(mist, Teff=Teff, logg=logg, feh=feh,
                         parallax=parallax, use_emcee=True)
     else:
-        mod = StarModel(mist, J=(J, J_err), H=(H, H_err), K=(K, K_err),
-                        parallax=parallax, use_emcee=True)
+        mod = StarModel(mist, J=(J, J_err), H=(H, H_err), K=(K, K_err))
 
     # Run emcee
-    nwalkers, nsteps, ndim = 64, 5000, len(params)
+    nwalkers, nsteps, ndim = 64, 10000, len(params)
     p0 = [1e-4*np.random.rand(ndim) + params for i in range(nwalkers)]
 
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob,
@@ -208,24 +207,24 @@ def age_hist(fname):
         The name of the h5 results file *and* the name of the figure.
     """
 
-    with h5py.File(os.path.join(RESULTS_DIR, "all_single.h5"),
+    with h5py.File(os.path.join(RESULTS_DIR, "all_single2.h5"),
                    "r") as f:
         flat0 = f["samples"][...]
     with h5py.File(os.path.join(RESULTS_DIR,
-                                "all_spec_single.h5".format(fname)),
+                                "all_spec_single2.h5".format(fname)),
                    "r") as f:
         flat1 = f["samples"][...]
-    with h5py.File(os.path.join(RESULTS_DIR, "gyro_single.h5".format(fname)),
+    with h5py.File(os.path.join(RESULTS_DIR, "gyro_single2.h5".format(fname)),
                    "r") as f:
         flat2 = f["samples"][...]
 
     plt.clf()
-    n = 30
+    n = 15
     plt.hist(np.exp(flat0[:, 3]), n, normed=True, color=".7", alpha=.5,
              label="$\mathrm{Colours}$")
     plt.hist(np.exp(flat1[:, 3]), n, normed=True, color=".3", alpha=.5,
              label="$\mathrm{Spectra}$")
-    plt.hist(np.exp(flat2[:, 3]), n, normed=True, color="k", alpha=.8,
+    plt.hist(np.exp(flat2[:, 6]), n, normed=True, color="k", alpha=.8,
              label="$\mathrm{Gyro}$")
     plt.legend()
     plt.xlabel("$\mathrm{Age~(Gyr)}$")
@@ -233,7 +232,7 @@ def age_hist(fname):
     plt.subplots_adjust(bottom=.15)
     plt.savefig(os.path.join(FIG_DIR, fname))
 
-
+0
 if __name__ == "__main__":
     FIG_DIR = "/Users/ruthangus/projects/chronometer/chronometer/figures"
     RESULTS_DIR = "/Users/ruthangus/projects/chronometer/chronometer/results"
@@ -243,5 +242,5 @@ if __name__ == "__main__":
     # par = [.7725, .601, .5189]
     # print(gc_model(par, np.log(4.567), .65))
     # assert 0
-    # sun_demo("gyro_single", gyro=True, iso=False, plot=False, spec=True)
+    # sun_demo("gyro_single", gyro=True, iso=True, plot=False, spec=True)
     age_hist("all_hist")
