@@ -43,27 +43,21 @@ def gc_lnlike(params, period, period_errs, bv, bv_errs, all_params=False):
     bv: (tuple)
         The B-V colour and colour uncertainty.
     """
-    if all_params:
-        N = int((len(params) - 3)/5)
-        pars = params[:3]
-        ln_ages = params[3+N:3+2*N]
-    else:
-        pars = params[:3]
-        ln_ages = params[3:]
+    pars, ln_ages = transform_parameters(params, "gyro", all_params)
     model_periods = gc_model(pars, ln_ages, bv)
     return sum(-.5*((period - model_periods)/period_errs)**2)
 
 
-def transform_parameters(p, indicator, all_params):
+def transform_parameters(lnparams, indicator, all_params):
     if indicator == "gyro":
         if all_params:
-            N = int((len(params) - 3)/5)
-            pars = params[:3]
-            ln_ages = params[3+N:3+2*N]
+            N = int((len(lnparams) - 3)/5)
+            pars = lnparams[:3]
+            ln_ages = lnparams[3+N:3+2*N]
         else:
-            pars = params[:3]
-            ln_ages = params[3:]
-        return ln_ages
+            pars = lnparams[:3]
+            ln_ages = lnparams[3:]
+        return pars, ln_ages
     elif indicator == "iso":
         if all_params:
             p = lnparams[3:]*1
@@ -76,7 +70,7 @@ def transform_parameters(p, indicator, all_params):
         p[:N] = np.exp(p[:N])
         p[N:2*N] = np.log10(1e9*np.exp(p[N:2*N]))
         p[3*N:4*N] = np.exp(p[3*N:4*N])
-        return p
+        return p, N
 
 
 def iso_lnlike(lnparams, mods, all_params=False):
@@ -90,17 +84,7 @@ def iso_lnlike(lnparams, mods, all_params=False):
     mod: (object)
         An isochrones.py starmodel object.
     """
-    if all_params:
-        p = lnparams[3:]*1
-    else:
-        p = lnparams*1
-    N = int(len(p)/5)
-
-    # Transform to linear space
-    # mass, age, feh, distance, Av
-    p[:N] = np.exp(p[:N])
-    p[N:2*N] = np.log10(1e9*np.exp(p[N:2*N]))
-    p[3*N:4*N] = np.exp(p[3*N:4*N])
+    p, N = transform_parameters(lnparams, "iso", all_params)
 
     if len(mods) > 1:
         ll = [mods[i].lnlike(p[i::N]) for i in range(len((mods)))]
