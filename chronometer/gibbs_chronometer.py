@@ -85,7 +85,6 @@ def iso_lnlike(lnparams, mods, all_params=False):
         An isochrones.py starmodel object.
     """
     p, N = transform_parameters(lnparams, "iso", all_params)
-
     if len(mods) > 1:
         ll = [mods[i].lnlike(p[i::N]) for i in range(len((mods)))]
         return sum(ll)
@@ -127,6 +126,7 @@ def iso_lnprior(params):
     feh_prior = sum([np.log(priors.feh_prior(i)) for i in feh])
     distance_prior = sum([np.log(priors.distance_prior(np.exp(i))) for i
                           in ln_distance])
+    print(N, ln_mass)
     m = (-20 < params) * (params < 20)
     mAv = (0 <= Av) * (Av < 1)
     if sum(m) == len(m) and sum(mAv) == len(mAv):
@@ -268,7 +268,9 @@ def parameter_assignment(params, indicator):
     Take the parameter array and split it into groups of parameters.
     """
     if indicator == "iso":
-        N = int(len(params)/5)  # number of stars
+        Nstars = int(len(params)/5.) # number of stars
+        print(Nstars, len(params), len(params)/5., int(len(params)/5.), indicator)
+        input("etner")
         ln_mass = params[:N]  # parameter assignment
         ln_age = params[N:2*N]
         feh = params[2*N:3*N]

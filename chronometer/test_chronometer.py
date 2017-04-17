@@ -75,6 +75,10 @@ class ChronometerTestCase(unittest.TestCase):
         self.assertTrue(type(N) == int)
         self.assertTrue(Nstars == N)
 
+        N, ln_mass, ln_age, feh, ln_distance, Av = \
+            gc.parameter_assignment(one_star_pars, "both")
+        self.assertTrue(type(N) == int)
+
     def test_transform_parameters_correct(self):
         Nstars = 3
         p, N = gc.transform_parameters(p0[3:], "iso", False)
