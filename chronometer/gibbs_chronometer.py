@@ -50,8 +50,33 @@ def gc_lnlike(params, period, period_errs, bv, bv_errs, all_params=False):
     else:
         pars = params[:3]
         ln_ages = params[3:]
-    return sum(-.5*((period - model_periods)/period_errs)**2)
     model_periods = gc_model(pars, ln_ages, bv)
+    return sum(-.5*((period - model_periods)/period_errs)**2)
+
+
+def transform_parameters(p, indicator, all_params):
+    if indicator == "gyro":
+        if all_params:
+            N = int((len(params) - 3)/5)
+            pars = params[:3]
+            ln_ages = params[3+N:3+2*N]
+        else:
+            pars = params[:3]
+            ln_ages = params[3:]
+        return ln_ages
+    elif indicator == "iso":
+        if all_params:
+            p = lnparams[3:]*1
+        else:
+            p = lnparams*1
+        N = int(len(p)/5)
+
+        # Transform to linear space
+        # mass, age, feh, distance, Av
+        p[:N] = np.exp(p[:N])
+        p[N:2*N] = np.log10(1e9*np.exp(p[N:2*N]))
+        p[3*N:4*N] = np.exp(p[3*N:4*N])
+        return p
 
 
 def iso_lnlike(lnparams, mods, all_params=False):
@@ -95,8 +120,7 @@ def iso_single_lnlike(lnparams, mod):
     mod: (object)
         An isochrones.py starmodel object.
     """
-    # Transform to linear space
-    # mass, age, feh, distance, Av
+    # Transform to linear space. mass, age, feh, distance, Av
     p = lnparams*1
     p[0], p[1] = np.exp(p[0]), np.log10(1e9*np.exp(p[1]))
     p[3] = np.exp(p[3])
@@ -112,19 +136,15 @@ def gyro_lnprior(params):
 
 
 def iso_lnprior(params):
-    N = int(len(params)/5)  # number of stars
-    ln_mass = params[:N]  # parameter assignment
-    ln_age = params[N:2*N]
-    feh = params[2*N:3*N]
-    distance = params[3*N:4*N]
-    Av = params[4*N:5*N]
+    N, ln_mass, ln_age, feh, ln_distance, Av = parameter_assignment(params,
+                                                                    "iso")
     age_prior = sum([np.log(priors.age_prior(np.log10(1e9*np.exp(i))))
                      for i in ln_age])
     feh_prior = sum([np.log(priors.feh_prior(i)) for i in feh])
     distance_prior = sum([np.log(priors.distance_prior(np.exp(i))) for i
-                          in distance])
+                          in ln_distance])
     m = (-20 < params) * (params < 20)
-    mAv = (0 < Av) * (Av < 1)
+    mAv = (0 <= Av) * (Av < 1)
     if sum(m) == len(m) and sum(mAv) == len(mAv):
         return age_prior + feh_prior + distance_prior # + Av_prior
     else:
@@ -136,24 +156,16 @@ def lnprior(params):
     lnprior on the parameters when both iso and gyro parameters are being
     inferred.
     """
-    # Parameter assignment
-    N = int(len(params[3:])/5)  # number of stars
-    ln_mass = params[3:3+N]  # parameter assignment
-    ln_age = params[3+N:3+2*N]
-    feh = params[3+2*N:3+3*N]
-    distance = params[3+3*N:3+4*N]
-    Av = params[3+4*N:3+5*N]
-
-    # Calculate priors from Tim's isochrones.py
+    N, ln_mass, ln_age, feh, ln_distance, Av = parameter_assignment(params,
+                                                                    "both")
     age_prior = sum([np.log(priors.age_prior(np.log10(1e9*np.exp(i))))
                      for i in ln_age])
     feh_prior = sum([np.log(priors.feh_prior(i)) for i in feh])
     distance_prior = sum([np.log(priors.distance_prior(np.exp(i))) for i
-                          in distance])
-    # Av_prior = sum([np.log(priors.AV_prior(Av[i])) for i in Av])
+                          in ln_distance])
     g_prior = priors.lng_prior(params[:3])
     m = (-20 < params) * (params < 20)  # Broad bounds on all params.
-    mAv = (0 < Av) * (Av < 1)
+    mAv = (0 <= Av) * (Av < 1)
     if sum(m) == len(m) and sum(mAv) == len(mAv):
         return age_prior + feh_prior + distance_prior + g_prior #+ Av_prior
     else:
@@ -239,7 +251,7 @@ def assign_args(p0, mods, d, i, g, star_number):
     return p0, args
 
 
-def pars_and_mods():
+def pars_and_mods(DATA_DIR):
     """
     Create the initial parameter array and the mod objects needed for
     isochrones.py
@@ -267,11 +279,49 @@ def pars_and_mods():
     return p0, mods
 
 
+def parameter_assignment(params, indicator):
+    """
+    Take the parameter array and split it into groups of parameters.
+    """
+    if indicator == "iso":
+        N = int(len(params)/5)  # number of stars
+        ln_mass = params[:N]  # parameter assignment
+        ln_age = params[N:2*N]
+        feh = params[2*N:3*N]
+        ln_distance = params[3*N:4*N]
+        Av = params[4*N:5*N]
+    elif indicator == "both":
+        N = int(len(params[3:])/5)  # number of stars
+        ln_mass = params[3:3+N]  # parameter assignment
+        ln_age = params[3+N:3+2*N]
+        feh = params[3+2*N:3+3*N]
+        ln_distance = params[3+3*N:3+4*N]
+        Av = params[3+4*N:3+5*N]
+    return N, ln_mass, ln_age, feh, ln_distance, Av
+
+
+def emc(p0, args, nwalkers, nsteps, burnin):
+    """
+    Run emcee for a set of parameters.
+    """
+    print("p0 = ", p0)
+    ndim = len(p0)
+    p0 = [1e-4*np.random.rand(ndim) + p0 for i in range(nwalkers)]
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=args)
+    print("burning in...")
+    pos, _, _ = sampler.run_mcmc(p0, burnin)
+    sampler.reset()
+    print("production run...")
+    sampler.run_mcmc(pos, nsteps)
+    end = time.time()
+    print("Time taken = ", (end - start)/60., "mins")
+
+
 if __name__ == "__main__":
 
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
 
-    params, mods = pars_and_mods()
+    params, mods = pars_and_mods(DATA_DIR)
     params_init = p0*1
 
     start = time.time()  # timeit
@@ -279,20 +329,10 @@ if __name__ == "__main__":
     # Iso or gyro or both? Assign args, etc.
     i, g = True, True
     star_number = None
-    p0, args, truths, labels = assign_args(params, mods, d, i, g, star_number)
+    p0, args = assign_args(params, mods, d, i, g, star_number)
 
-    # Run emcee and plot corner
-    print("p0 = ", p0)
-    nwalkers, nsteps, ndim = 64, 5000, len(p0)
-    p0 = [1e-4*np.random.rand(ndim) + p0 for i in range(nwalkers)]
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=args)
-    print("burning in...")
-    pos, _, _ = sampler.run_mcmc(p0, 2000)
-    sampler.reset()
-    print("production run...")
-    sampler.run_mcmc(pos, nsteps)
-    end = time.time()
-    print("Time taken = ", (end - start)/60., "mins")
+    # First Gibbs step: Run on everything.
+    sampler = emc(p0, args, 64, 5000, 2000)
 
     print("Making corner plot")
     flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
