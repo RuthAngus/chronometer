@@ -77,8 +77,11 @@ def iso_lnlike(lnparams, mods, all_params=False):
     p[N:2*N] = np.log10(1e9*np.exp(p[N:2*N]))
     p[3*N:4*N] = np.exp(p[3*N:4*N])
 
-    ll = [mods[i].lnlike(p[i::N]) for i in range(len((mods)))]
-    return sum(ll)
+    if len(mods) > 1:
+        ll = [mods[i].lnlike(p[i::N]) for i in range(len((mods)))]
+        return sum(ll)
+    else:
+        return mods.lnlike(p)
 
 
 def iso_single_lnlike(lnparams, mod):
@@ -204,7 +207,11 @@ def plot_gyro_result(flat, params_init, i, g):
     plt.savefig("period_age_data")
 
 
-def assign_args(p0, mods, d, i, g):
+def assign_args(p0, mods, d, i, g, star_number):
+    """
+    Create the parameter and mod arrays needed to specify whether global or
+    individual parameters will be sampled.
+    """
     if g:  # Convert V-K to B-V
         m = np.isfinite(d.bv.values)
         teff = vk2teff(d.vk.values[~m])
@@ -215,39 +222,28 @@ def assign_args(p0, mods, d, i, g):
         print("gyro and iso")
         args = [mods, d.period.values, d.period_err.values, d.bv.values,
                 d.bv_err.values, "both"]
-        truths = [.7725, .601, .5189, np.log(1), None, None, np.log(4.56),
-                  np.log(2.5), np.log(2.5), 0., None, None, np.log(10),
-                  np.log(2400), np.log(2400), 0., None, None]
-        labels = ["$a$", "$b$", "$n$", "$\ln(Mass_1)$", "$\ln(Mass_2)$",
-                  "$\ln(Mass_3)$", "$\ln(Age_1)$", "$\ln(Age_2)$",
-                  "$\ln(Age_3)$", "$[Fe/H]_1$", "$[Fe/H]_2$", "$[Fe/H]_3$",
-                  "$\ln(D_1)$", "$\ln(D_2)$", "$\ln(D_3)$", "$A_{v1}$",
-                  "$A_{v2}$", "$A_{v3}$"]
     if g and not i:  # If gyro inference
         print("gyro")
         N = len(d.age.values)
         p0 = np.concatenate((p0[:3], p0[3+N:3+2*N]))
         args = [d.period.values, d.period_err.values, d.bv.values,
                 d.bv_err.values, "gyro"]
-        truths = [.7725, .601, .5189, np.log(4.56), np.log(2.5), np.log(2.5)]
-        labels = ["$a$", "$b$", "$n$", "$\ln(Age_1)$", "$\ln(Age_2)$",
-                  "$\ln(Age_3)$"]
     elif i and not g:  # If Iso inference.
         print("iso")
         p0 = p0[3:]
+        if star_number:
+            Nstars = int(len(p0)/5)
+            p0 = p0[star_number:Nstars]
+            mods = mod[star_number]
         args = [mods, "iso"]
-        truths = [np.log(1), None, None, np.log(4.56), np.log(2.5),
-                  np.log(2.5), 0., None, None, np.log(10), np.log(2400),
-                  np.log(2400), 0., None, None]
-        labels = ["$\ln(Mass_1)$", "$\ln(Mass_2)$", "$\ln(Mass_3)$",
-                  "$\ln(Age_1)$", "$\ln(Age_2)$", "$\ln(Age_3)$",
-                  "$[Fe/H]_1$", "$[Fe/H]_2$", "$[Fe/H]_3$", "$\ln(D_1)$",
-                  "$\ln(D_2)$", "$\ln(D_3)$", "$A_{v1}$", "$A_{v2}$",
-                  "$A_{v3}$"]
-    return p0, args, truths, labels
+    return p0, args
 
 
 def pars_and_mods():
+    """
+    Create the initial parameter array and the mod objects needed for
+    isochrones.py
+    """
     # The initial parameters
     gc = np.array([.7725, .601, .5189])
     d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
@@ -275,14 +271,15 @@ if __name__ == "__main__":
 
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
 
-    p0, mods = pars_and_mods()
+    params, mods = pars_and_mods()
     params_init = p0*1
 
     start = time.time()  # timeit
 
     # Iso or gyro or both? Assign args, etc.
     i, g = True, True
-    p0, args, truths, labels = assign_args(p0, mods, d, i, g)
+    star_number = None
+    p0, args, truths, labels = assign_args(params, mods, d, i, g, star_number)
 
     # Run emcee and plot corner
     print("p0 = ", p0)
@@ -299,8 +296,8 @@ if __name__ == "__main__":
 
     print("Making corner plot")
     flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
-    fig = corner.corner(flat, labels=labels, truths=truths)
-    fig.savefig("corner_working")
+    fig = corner.corner(flat)
+    fig.savefig("corner_gibbs")
 
     print("Plotting results and traces")
     plot_gyro_result(flat, params_init, i, g)
