@@ -81,6 +81,25 @@ def iso_lnlike(lnparams, mods, all_params=False):
     return sum(ll)
 
 
+def iso_single_lnlike(lnparams, mod):
+    """
+    Some isochronal likelihood function.
+    parameters:
+    ----------
+    lnparams: (array)
+        The array of parameters: log(mass), log(age in Gyr), metallicity,
+        log(distance), extinction.
+    mod: (object)
+        An isochrones.py starmodel object.
+    """
+    # Transform to linear space
+    # mass, age, feh, distance, Av
+    p = lnparams*1
+    p[0], p[1] = np.exp(p[0]), np.log10(1e9*np.exp(p[1]))
+    p[3] = np.exp(p[3])
+    return mod.lnlike(p)
+
+
 def gyro_lnprior(params):
     m = (-10 < params) * (params < 10)  # Broad bounds on all params.
     if sum(m) == len(m):
