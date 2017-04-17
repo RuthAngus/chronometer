@@ -1,5 +1,7 @@
-# Assembling likelihood functions for Gyrochronology, isochrones, dynamics
-# and asteroseismology.
+"""
+Now use Gibbs sampling to update individual star parameters and global gyro
+parameters.
+"""
 
 import os
 
@@ -147,24 +149,17 @@ def lnprob(params, *args):
 
     # Figure out whether the iso or gyro or both likelihoods should be called.
     if args[-1] == "gyro":
-        iso, gyro = False, True
+        period, period_errs, bv, bv_errs, _ = args
+        return gc_lnlike(params, period, period_errs, bv, bv_errs) + \
+            gyro_lnprior(params)
     elif args[-1] == "iso":
-        iso, gyro = True, False
+        mods, _ = args
+        return iso_lnlike(params, mods) + iso_lnprior(params)
     elif args[-1] == "both":
-        iso, gyro = True, True
-
-    if iso and gyro:
         mods, period, period_errs, bv, bv_errs, _ = args
         return gc_lnlike(params, period, period_errs, bv, bv_errs,
                          all_params=True) + \
             iso_lnlike(params, mods, all_params=True) + lnprior(params)
-    elif gyro:
-        period, period_errs, bv, bv_errs, _ = args
-        return gc_lnlike(params, period, period_errs, bv, bv_errs) + \
-            gyro_lnprior(params)
-    elif iso:
-        mods, _ = args
-        return iso_lnlike(params, mods) + iso_lnprior(params)
 
 
 def plot_gyro_result(flat, params_init, i, g):
