@@ -6,6 +6,7 @@
 *blg
 *ini
 *csv
+*h5
 .DS_Store
 .coverage
 .ipynb_checkpoints
