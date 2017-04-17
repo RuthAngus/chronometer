@@ -1,0 +1,12 @@
+*png
+*txt
+*aux
+*bbl
+*log
+*blg
+*ini
+*csv
+.DS_Store
+.coverage
+.ipynb_checkpoints
+__pycache__
