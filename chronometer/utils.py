@@ -22,6 +22,8 @@ def replace_nans_with_inits(data):
         = np.zeros(len(data.feh.values[~np.isfinite(data.feh.values)]))
     data.Av.values[~np.isfinite(data.Av.values)] \
         = np.zeros(len(data.Av.values[~np.isfinite(data.Av.values)]))
+    data.parallax.values[~np.isfinite(data.parallax.values)] \
+        = np.zeros(len(data.parallax.values[~np.isfinite(data.parallax.values)]))
     # data.parallax.values[~np.isfinite(data.parallax.values)] \
     #     = [None] * \
     #     (len(data.parallax.values[~np.isfinite(data.parallax.values)]))
