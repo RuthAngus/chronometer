@@ -123,7 +123,8 @@ class ChronometerTestCase(unittest.TestCase):
         params, mods = gc.pars_and_mods(DATA_DIR)
         p0, args = gc.assign_args(params, mods, d, i, g, star_number)
         N, nd = 100, 3 + 5*3
-        nsteps, ndim = np.shape(gc.MH(p0, N, .01, *args))
+        samples, par = gc.MH(p0, N, .01, *args)
+        nsteps, ndim = np.shape(samples)
         self.assertTrue(nsteps == N)
         self.assertTrue(ndim == nd)
 
