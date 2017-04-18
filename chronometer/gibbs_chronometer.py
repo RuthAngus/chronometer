@@ -317,11 +317,10 @@ if __name__ == "__main__":
     # Iso or gyro or both? Assign args, etc.
     i, g = True, False
     # star_number = None
-    star_number = 0
+    star_number = 1
     p0, args = assign_args(params, mods, i, g, star_number)
     print("p0 = ", p0)
     print("args = ", args)
-    input("enter")
 
     # First Gibbs step: Run on everything.
     # nwalkers, nsteps, burnin = 64, 5000, 2000
@@ -332,7 +331,7 @@ if __name__ == "__main__":
     ndim = len(p0)
     flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
     fig = corner.corner(flat)
-    fig.savefig("corner_0")
+    fig.savefig("corner_1")
 
     print("Plotting results and traces")
     # plot_gyro_result(flat, params_init, i, g)
