@@ -89,7 +89,7 @@ def iso_lnlike(lnparams, mods, all_params=False):
         ll = [mods[i].lnlike(p[i::N]) for i in range(len((mods)))]
         return sum(ll)
     else:
-        return mods.lnlike(p)
+        return mods[0].lnlike(p)
 
 
 def iso_single_lnlike(lnparams, mod):
@@ -202,7 +202,7 @@ def plot_gyro_result(flat, params_init, i, g):
     plt.savefig("period_age_data")
 
 
-def assign_args(p0, mods, d, i, g, star_number):
+def assign_args(p0, mods, i, g, star_number):
     """
     Create the parameter and mod arrays needed to specify whether global or
     individual parameters will be sampled.
@@ -226,10 +226,10 @@ def assign_args(p0, mods, d, i, g, star_number):
     elif i and not g:  # If Iso inference.
         print("iso")
         p0 = p0[3:]
-        if star_number:
-            Nstars = int(len(p0)/5)
-            p0 = p0[star_number:Nstars]
-            mods = mod[star_number]
+        if star_number is not None:
+            Nstars = int(len(p0)/5.)
+            p0 = p0[star_number::Nstars]
+            mods = [mods[star_number]]
         args = [mods, "iso"]
     return p0, args
 
@@ -290,7 +290,6 @@ def emc(p0, args, nwalkers, nsteps, burnin):
     Then just run the global parameters, then run all.
     Use emcee for now.
     """
-    print("p0 = ", p0)
     ndim = len(p0)
     p0 = [1e-4*np.random.rand(ndim) + p0 for i in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=args)
@@ -301,32 +300,42 @@ def emc(p0, args, nwalkers, nsteps, burnin):
     sampler.run_mcmc(pos, nsteps)
     end = time.time()
     print("Time taken = ", (end - start)/60., "mins")
+    return sampler
 
 
 if __name__ == "__main__":
 
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
+    d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
 
+    # Generate the initial parameter array and the mods objects from the data.
     params, mods = pars_and_mods(DATA_DIR)
-    params_init = p0*1
+    params_init = params*1
 
     start = time.time()  # timeit
 
     # Iso or gyro or both? Assign args, etc.
-    i, g = True, True
-    star_number = None
-    p0, args = assign_args(params, mods, d, i, g, star_number)
+    i, g = True, False
+    # star_number = None
+    star_number = 0
+    p0, args = assign_args(params, mods, i, g, star_number)
+    print("p0 = ", p0)
+    print("args = ", args)
+    input("enter")
 
     # First Gibbs step: Run on everything.
-    sampler = emc(p0, args, 64, 5000, 2000)
+    # nwalkers, nsteps, burnin = 64, 5000, 2000
+    nwalkers, nsteps, burnin = 64, 50, 2
+    sampler = emc(p0, args, nwalkers, nsteps, burnin)
 
     print("Making corner plot")
+    ndim = len(p0)
     flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
     fig = corner.corner(flat)
-    fig.savefig("corner_gibbs")
+    fig.savefig("corner_0")
 
     print("Plotting results and traces")
-    plot_gyro_result(flat, params_init, i, g)
+    # plot_gyro_result(flat, params_init, i, g)
 
     # Plot probability
     plt.clf()
