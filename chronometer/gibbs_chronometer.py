@@ -321,16 +321,22 @@ def MH(par, nsteps, t, *args):
     """
     ndim = len(par)
     samples = np.zeros((nsteps, ndim))
+    accept = []
     for i in range(nsteps):
         newp = par + np.random.randn(ndim)*t
         alpha = np.exp(lnprob(newp, *args))/np.exp(lnprob(par, *args))
         if alpha > 1:
             par = newp*1
+            accept.append(1)
         else:
             u = np.random.uniform(0, 1)
             if alpha > u:
                 par = newp*1
+                accept.append(1)
+            else:
+                accept.append(0)
         samples[i, :] = par
+    print("Acceptance fraction = ", float(sum(accept))/len(accept))
     return samples, par
 
 
@@ -362,56 +368,50 @@ def gibbs_control(par, d, nsteps, t):
         2d array of samples.
     """
     nstars, ndim = len(d.age.values), len(par)
-    n_parameter_sets = nstars + 2  # No conditionally independent param sets.
-    niter = 3  # Number of 'rounds' of MCMC
+    n_parameter_sets = nstars + 2  # Num conditionally independent param sets
+    niter = 10  # Number of 'rounds' of MCMC
 
     # Final sample array
     all_samples = np.zeros((nsteps * n_parameter_sets * niter, ndim))
 
-    # First sample all the parameters.
+    # Iterate over niter cycles of parameter sets.
     _set = 0
-    samples, last_sample = run_MCMC(par, True, True, None)
-    all_samples[nsteps*_set:nsteps*(_set+1):] = samples
+    for i in range(niter):
+        print("set", _set)
+        # First sample all the parameters.
+        samples, last_sample = run_MCMC(par, True, True, None)
+        all_samples[nsteps*_set:nsteps*(_set+1):] = samples
 
-    # Then sample the gyro parameters only.
-    _set = 1
-    gyro_samples, last_gyro_sample = run_MCMC(par, False, True, None)
-    all_samples[nsteps*_set:(_set+1)*nsteps, :3] = gyro_samples[:, :3]
-    all_samples[nsteps*_set:(_set+1)*nsteps, 3+nstars:3+2*nstars] = \
-        gyro_samples[:, 3:]
-
-    # Then sample the stars, one by one.
-    single_last_samps = []
-    _set = 2
-    for i in range(nstars):
-        samps, last_samp = run_MCMC(par, True, False, i)
-        single_last_samps.append(last_samp)
-        all_samples[_set*nsteps:(_set+1)*nsteps, 3+i::nstars] = samps
+        # Then sample the gyro parameters only.
         _set += 1
-    input("enter")
+        print("set", _set)
+        gyro_samples, last_gyro_sample = run_MCMC(last_sample, False, True,
+                                                  None)
+        all_samples[nsteps*_set:(_set+1)*nsteps, :3] = gyro_samples[:, :3]
+        all_samples[nsteps*_set:(_set+1)*nsteps, 3+nstars:3+2*nstars] = \
+            gyro_samples[:, 3:]
 
-    # star_number = 1
-    # p0, args = assign_args(params, mods, d, i, g, star_number)
-    # flat1 = emc(p0, args, nwalkers, nsteps, burnin)
-    # star_number = 2
-    # p0, args = assign_args(params, mods, d, i, g, star_number)
-    # flat2 = emc(p0, args, nwalkers, nsteps, burnin)
-    # star_number = None
-    # pars0 = [np.percentile(flat0[:, i], 50) for i in range(5)]
-    # pars1 = [np.percentile(flat1[:, i], 50) for i in range(5)]
-    # pars2 = [np.percentile(flat2[:, i], 50) for i in range(5)]
-    # params = np.zeros((3*5))
-    # params[::3], params[1::3], params[2::3] = pars0, pars1, pars2
-    # print("params", params)
-    # p0, args = assign_args(params, mods, d, i, g, star_number, all_pars=True)
-    # print("p0", p0)
-    # for i in range(len(p0)):
-    #     assert p0[i] == params[i]
-    # input("e")
-    # flat_iso = emc(p0, args, nwalkers, nsteps, burnin)
+        # Replace parameter array with the last sample from gyro.
+        last_sample[:3] = last_gyro_sample[:3]
+        last_sample[3+nstars:3+2*nstars] = last_gyro_sample[3:]
 
-    # i, g = True, False
+        # Then sample the stars, one by one.
+        single_last_samps = []
+        _set += 1
+        print("set", _set)
+        for i in range(nstars):
+            samps, last_samp = run_MCMC(last_sample, True, False, i)
+            single_last_samps.append(last_samp)
+            all_samples[_set*nsteps:(_set+1)*nsteps, 3+i::nstars] = samps
+            _set += 1
+            print("set", _set)
 
+        # Replace parameter array with the last sample from single star iso.
+        for i in range(nstars):
+            last_sample[3+i::nstars] = single_last_samps[i]
+        print("last_sample = ", last_sample)
+
+    return all_samples
 
 
 if __name__ == "__main__":
@@ -425,24 +425,24 @@ if __name__ == "__main__":
 
     start = time.time()  # timeit
 
-    nsteps, t = 10, .01
+    nsteps, t = 50000, 1e-2
     flat = gibbs_control(params, d, nsteps, t)
 
     print("Making corner plot")
     ndim = len(params)
     fig = corner.corner(flat)
-    fig.savefig("corner_1")
+    fig.savefig("corner_gibbs_for_realz")
 
     print("Plotting results and traces")
     # plot_gyro_result(flat, params_init, i, g)
 
-    # Plot probability
-    plt.clf()
-    plt.plot(sampler.lnprobability.T, "k")
-    plt.savefig("prob_trace")
+    # # Plot probability
+    # plt.clf()
+    # plt.plot(sampler.lnprobability.T, "k")
+    # plt.savefig("prob_trace")
 
-    # Plot chains
-    for i in range(ndim):
-        plt.clf()
-        plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
-        plt.savefig("{}_trace".format(i))
+    # # Plot chains
+    # for i in range(ndim):
+    #     plt.clf()
+    #     plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
+    #     plt.savefig("{}_trace".format(i))
