@@ -202,7 +202,7 @@ def plot_gyro_result(flat, params_init, i, g):
     plt.savefig("period_age_data")
 
 
-def assign_args(p0, mods, d, i, g, star_number, all_pars=False):
+def assign_args(p0, mods, d, i, g, star_number, all_pars=False, verbose=True):
     """
     Create the parameter and mod arrays needed to specify whether global or
     individual parameters will be sampled.
@@ -214,17 +214,20 @@ def assign_args(p0, mods, d, i, g, star_number, all_pars=False):
         d.bv.values[~m] = new_bv
         d.bv_err.values[~m] = np.ones(len(d.bv.values[~m])) * .01
     if g and i:
-        print("gyro and iso")
+        if verbose:
+            print("gyro and iso")
         args = [mods, d.period.values, d.period_err.values, d.bv.values,
                 d.bv_err.values, "both"]
     if g and not i:  # If gyro inference
-        print("gyro")
+        if verbose:
+            print("gyro")
         N = len(d.age.values)
         p0 = np.concatenate((p0[:3], p0[3+N:3+2*N]))
         args = [d.period.values, d.period_err.values, d.bv.values,
                 d.bv_err.values, "gyro"]
     elif i and not g:  # If Iso inference.
-        print("iso", star_number)
+        if verbose:
+            print("iso", star_number)
         if not all_pars:
             p0 = p0[3:]
         if star_number is not None:
@@ -340,7 +343,7 @@ def MH(par, nsteps, t, *args):
     return samples, par
 
 
-def run_MCMC(params, i, g, star_number):
+def run_MCMC(params, mods, d, i, g, star_number, nsteps, t):
     """
     Run the MCMC for a given set of parameters.
     """
@@ -349,7 +352,7 @@ def run_MCMC(params, i, g, star_number):
     return MH(p0, nsteps, t, *args)
 
 
-def gibbs_control(par, d, nsteps, t):
+def gibbs_control(par, mods, d, nsteps, niter, t):
     """
     This function tells the metropolis hastings what parameters to sample in.
     params:
@@ -369,7 +372,6 @@ def gibbs_control(par, d, nsteps, t):
     """
     nstars, ndim = len(d.age.values), len(par)
     n_parameter_sets = nstars + 2  # Num conditionally independent param sets
-    niter = 10  # Number of 'rounds' of MCMC
 
     # Final sample array
     all_samples = np.zeros((nsteps * n_parameter_sets * niter, ndim))
@@ -379,14 +381,16 @@ def gibbs_control(par, d, nsteps, t):
     for i in range(niter):
         print("set", _set)
         # First sample all the parameters.
-        samples, last_sample = run_MCMC(par, True, True, None)
+        samples, last_sample = run_MCMC(par, mods, d, True, True, None,
+                                        nsteps, t)
         all_samples[nsteps*_set:nsteps*(_set+1):] = samples
 
         # Then sample the gyro parameters only.
         _set += 1
         print("set", _set)
-        gyro_samples, last_gyro_sample = run_MCMC(last_sample, False, True,
-                                                  None)
+        gyro_samples, last_gyro_sample = run_MCMC(last_sample, mods, d,
+                                                  False, True, None, nsteps,
+                                                  t)
         all_samples[nsteps*_set:(_set+1)*nsteps, :3] = gyro_samples[:, :3]
         all_samples[nsteps*_set:(_set+1)*nsteps, 3+nstars:3+2*nstars] = \
             gyro_samples[:, 3:]
@@ -400,7 +404,8 @@ def gibbs_control(par, d, nsteps, t):
         _set += 1
         print("set", _set)
         for i in range(nstars):
-            samps, last_samp = run_MCMC(last_sample, True, False, i)
+            samps, last_samp = run_MCMC(last_sample, mods, d, True, False, i,
+                                        nsteps, t)
             single_last_samps.append(last_samp)
             all_samples[_set*nsteps:(_set+1)*nsteps, 3+i::nstars] = samps
             _set += 1
@@ -425,8 +430,11 @@ if __name__ == "__main__":
 
     start = time.time()  # timeit
 
-    nsteps, t = 50000, 1e-2
-    flat = gibbs_control(params, d, nsteps, t)
+    nsteps, niter, t = 50000, 10, 1e-2
+    flat = gibbs_control(params, mods, d, nsteps, niter, t)
+
+    end = time.time()
+    print("Time taken = ", (end - start)/60, "minutes")
 
     print("Making corner plot")
     ndim = len(params)
