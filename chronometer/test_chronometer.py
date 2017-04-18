@@ -121,12 +121,31 @@ class ChronometerTestCase(unittest.TestCase):
         print("Test 7")
         i, g, star_number = True, True, None
         params, mods = gc.pars_and_mods(DATA_DIR)
-        p0, args = gc.assign_args(params, mods, d, i, g, star_number)
+        p0, args = gc.assign_args(params, mods, d, i, g, star_number,
+                                  verbose=False)
         N, nd = 100, 3 + 5*3
         samples, par = gc.MH(p0, N, .01, *args)
         nsteps, ndim = np.shape(samples)
         self.assertTrue(nsteps == N)
         self.assertTrue(ndim == nd)
+
+    def test_run_MCMC_sample_shape(self):
+        samps, last_samp = gc.run_MCMC(p0, mods, d, True, True, None, 10,
+                                       1e-2)
+        self.assertTrue(np.shape(samps) == (10, 18))
+        self.assertTrue(len(last_samp) == 18)
+        samps, last_samp = gc.run_MCMC(p0, mods, d, True, False, 0, 10,
+                                       1e-2)
+        self.assertTrue(np.shape(samps) == (10, 5))
+        self.assertTrue(len(last_samp) == 5)
+        samps, last_samp = gc.run_MCMC(p0, mods, d, False, True, None, 10,
+                                       1e-2)
+        self.assertTrue(np.shape(samps) == (10, 6))
+        self.assertTrue(len(last_samp) == 6)
+
+    def test_gibbs_control(self):
+        samples = gc.gibbs_control(p0, mods, d, 5, 1, 1e-2)
+        print(np.shape(samples))
 
 
 if __name__ == "__main__":
