@@ -202,7 +202,7 @@ def plot_gyro_result(flat, params_init, i, g):
     plt.savefig("period_age_data")
 
 
-def assign_args(p0, mods, i, g, star_number):
+def assign_args(p0, mods, d, i, g, star_number, all_pars=False):
     """
     Create the parameter and mod arrays needed to specify whether global or
     individual parameters will be sampled.
@@ -225,7 +225,8 @@ def assign_args(p0, mods, i, g, star_number):
                 d.bv_err.values, "gyro"]
     elif i and not g:  # If Iso inference.
         print("iso")
-        p0 = p0[3:]
+        if not all_pars:
+            p0 = p0[3:]
         if star_number is not None:
             Nstars = int(len(p0)/5.)
             p0 = p0[star_number::Nstars]
@@ -300,7 +301,37 @@ def emc(p0, args, nwalkers, nsteps, burnin):
     sampler.run_mcmc(pos, nsteps)
     end = time.time()
     print("Time taken = ", (end - start)/60., "mins")
-    return sampler
+    flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
+    return flat
+
+
+def MH(par, nsteps, t, *args):
+    """
+    params:
+    -------
+    par: (list)
+        The parameters.
+    nsteps: (int)
+        Number of samples.
+    t: (float)
+        The std of the proposal distribution.
+    args:
+    x, y, yerr: (arrays)
+        The data
+    """
+    ndim = len(par)
+    samples = np.zeros((nsteps, ndim))
+    for i in range(nsteps):
+        newp = par + np.random.randn(ndim)*t
+        alpha = np.exp(lnprob(newp, *args))/np.exp(lnprob(par, *args))
+        if alpha > 1:
+            par = newp*1
+        else:
+            u = np.random.uniform(0, 1)
+            if alpha > u:
+                par = newp*1
+        samples[i, :] = par
+    return samples
 
 
 if __name__ == "__main__":
@@ -316,20 +347,34 @@ if __name__ == "__main__":
 
     # Iso or gyro or both? Assign args, etc.
     i, g = True, False
-    # star_number = None
-    star_number = 1
-    p0, args = assign_args(params, mods, i, g, star_number)
-    print("p0 = ", p0)
-    print("args = ", args)
-
-    # First Gibbs step: Run on everything.
-    # nwalkers, nsteps, burnin = 64, 5000, 2000
     nwalkers, nsteps, burnin = 64, 50, 2
-    sampler = emc(p0, args, nwalkers, nsteps, burnin)
+    star_number = 0
+    p0, args = assign_args(params, mods, d, i, g, star_number)
+    flat0 = emc(p0, args, nwalkers, nsteps, burnin)
+    star_number = 1
+    p0, args = assign_args(params, mods, d, i, g, star_number)
+    flat1 = emc(p0, args, nwalkers, nsteps, burnin)
+    star_number = 2
+    p0, args = assign_args(params, mods, d, i, g, star_number)
+    flat2 = emc(p0, args, nwalkers, nsteps, burnin)
+    star_number = None
+    pars0 = [np.percentile(flat0[:, i], 50) for i in range(5)]
+    pars1 = [np.percentile(flat1[:, i], 50) for i in range(5)]
+    pars2 = [np.percentile(flat2[:, i], 50) for i in range(5)]
+    params = np.zeros((3*5))
+    params[::3], params[1::3], params[2::3] = pars0, pars1, pars2
+    print("params", params)
+    p0, args = assign_args(params, mods, d, i, g, star_number, all_pars=True)
+    print("p0", p0)
+    for i in range(len(p0)):
+        assert p0[i] == params[i]
+    input("e")
+    flat_iso = emc(p0, args, nwalkers, nsteps, burnin)
+
+    # i, g = True, False
 
     print("Making corner plot")
     ndim = len(p0)
-    flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
     fig = corner.corner(flat)
     fig.savefig("corner_1")
 
