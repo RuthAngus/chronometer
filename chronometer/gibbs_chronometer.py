@@ -224,7 +224,7 @@ def assign_args(p0, mods, d, i, g, star_number, all_pars=False):
         args = [d.period.values, d.period_err.values, d.bv.values,
                 d.bv_err.values, "gyro"]
     elif i and not g:  # If Iso inference.
-        print("iso")
+        print("iso", star_number)
         if not all_pars:
             p0 = p0[3:]
         if star_number is not None:
@@ -331,7 +331,87 @@ def MH(par, nsteps, t, *args):
             if alpha > u:
                 par = newp*1
         samples[i, :] = par
-    return samples
+    return samples, par
+
+
+def run_MCMC(params, i, g, star_number):
+    """
+    Run the MCMC for a given set of parameters.
+    """
+    p0, args = assign_args(params, mods, d, i, g, star_number)
+    assert np.isfinite(lnprob(p0, *args))
+    return MH(p0, nsteps, t, *args)
+
+
+def gibbs_control(par, d, nsteps, t):
+    """
+    This function tells the metropolis hastings what parameters to sample in.
+    params:
+    ------
+    par: (list)
+        The parameters.
+    d: (pandas.dataframe)
+        The data.
+    nsteps: (int)
+        Number of samples.
+    t: (float)
+        The std of the proposal distribution.
+    returns:
+    -------
+    samples: (np.array)
+        2d array of samples.
+    """
+    nstars, ndim = len(d.age.values), len(par)
+    n_parameter_sets = nstars + 2  # No conditionally independent param sets.
+    niter = 3  # Number of 'rounds' of MCMC
+
+    # Final sample array
+    all_samples = np.zeros((nsteps * n_parameter_sets * niter, ndim))
+
+    # First sample all the parameters.
+    _set = 0
+    samples, last_sample = run_MCMC(par, True, True, None)
+    all_samples[nsteps*_set:nsteps*(_set+1):] = samples
+
+    # Then sample the gyro parameters only.
+    _set = 1
+    gyro_samples, last_gyro_sample = run_MCMC(par, False, True, None)
+    all_samples[nsteps*_set:(_set+1)*nsteps, :3] = gyro_samples[:, :3]
+    all_samples[nsteps*_set:(_set+1)*nsteps, 3+nstars:3+2*nstars] = \
+        gyro_samples[:, 3:]
+
+    # Then sample the stars, one by one.
+    single_last_samps = []
+    _set = 2
+    for i in range(nstars):
+        samps, last_samp = run_MCMC(par, True, False, i)
+        single_last_samps.append(last_samp)
+        all_samples[_set*nsteps:(_set+1)*nsteps, 3+i::nstars] = samps
+        _set += 1
+    input("enter")
+
+    # star_number = 1
+    # p0, args = assign_args(params, mods, d, i, g, star_number)
+    # flat1 = emc(p0, args, nwalkers, nsteps, burnin)
+    # star_number = 2
+    # p0, args = assign_args(params, mods, d, i, g, star_number)
+    # flat2 = emc(p0, args, nwalkers, nsteps, burnin)
+    # star_number = None
+    # pars0 = [np.percentile(flat0[:, i], 50) for i in range(5)]
+    # pars1 = [np.percentile(flat1[:, i], 50) for i in range(5)]
+    # pars2 = [np.percentile(flat2[:, i], 50) for i in range(5)]
+    # params = np.zeros((3*5))
+    # params[::3], params[1::3], params[2::3] = pars0, pars1, pars2
+    # print("params", params)
+    # p0, args = assign_args(params, mods, d, i, g, star_number, all_pars=True)
+    # print("p0", p0)
+    # for i in range(len(p0)):
+    #     assert p0[i] == params[i]
+    # input("e")
+    # flat_iso = emc(p0, args, nwalkers, nsteps, burnin)
+
+    # i, g = True, False
+
 
 
 if __name__ == "__main__":
@@ -345,36 +425,11 @@ if __name__ == "__main__":
 
     start = time.time()  # timeit
 
-    # Iso or gyro or both? Assign args, etc.
-    i, g = True, False
-    nwalkers, nsteps, burnin = 64, 50, 2
-    star_number = 0
-    p0, args = assign_args(params, mods, d, i, g, star_number)
-    flat0 = emc(p0, args, nwalkers, nsteps, burnin)
-    star_number = 1
-    p0, args = assign_args(params, mods, d, i, g, star_number)
-    flat1 = emc(p0, args, nwalkers, nsteps, burnin)
-    star_number = 2
-    p0, args = assign_args(params, mods, d, i, g, star_number)
-    flat2 = emc(p0, args, nwalkers, nsteps, burnin)
-    star_number = None
-    pars0 = [np.percentile(flat0[:, i], 50) for i in range(5)]
-    pars1 = [np.percentile(flat1[:, i], 50) for i in range(5)]
-    pars2 = [np.percentile(flat2[:, i], 50) for i in range(5)]
-    params = np.zeros((3*5))
-    params[::3], params[1::3], params[2::3] = pars0, pars1, pars2
-    print("params", params)
-    p0, args = assign_args(params, mods, d, i, g, star_number, all_pars=True)
-    print("p0", p0)
-    for i in range(len(p0)):
-        assert p0[i] == params[i]
-    input("e")
-    flat_iso = emc(p0, args, nwalkers, nsteps, burnin)
-
-    # i, g = True, False
+    nsteps, t = 10, .01
+    flat = gibbs_control(params, d, nsteps, t)
 
     print("Making corner plot")
-    ndim = len(p0)
+    ndim = len(params)
     fig = corner.corner(flat)
     fig.savefig("corner_1")
 
