@@ -197,7 +197,52 @@ def assign_args(p0, mods, t, d, i, g, star_number, all_pars=False,
     return p0, args, t
 
 
-def MH(par, nsteps, t, *args):
+def my_MH(par, lnlike, N, t, *args):
+    """
+    params:
+    -------
+    par: (list)
+        The parameters.
+    x, y, yerr: (arrays)
+        The data
+    N: (int)
+        Number of samples.
+    t: (float)
+        The std of the proposal distribution.
+    """
+    x, y, yerr = args
+    samples = np.zeros((N, len(par)))
+    for i in range(N):
+        newp = par + np.random.randn(len(par))*t
+        alpha = np.exp(lnlike(newp, x, y, yerr))/np.exp(lnlike(par, x, y,
+                                                               yerr))
+        if alpha > 1:
+            par = newp*1
+        else:
+            u = np.random.uniform(0, 1)
+            if alpha > u:
+                par = newp*1
+        samples[i, :] = par
+    return samples
+
+
+# def my_MH(par, lnprob, N, t, *args):
+#     x, y, yerr = args
+#     samples = np.zeros((N, len(par)))
+#     for i in range(N):
+#         newp = par + np.random.randn(len(par))*t
+#         alpha = np.exp(lnprob(newp, x, y, yerr))/np.exp(lnprob(par, x, y,
+#                                                                yerr))
+#         if alpha > 1:
+#             par = newp*1
+#         else:
+#             u = np.random.uniform(0, 1)
+#             if alpha > u:
+#                 par = newp*1
+#         samples[i, :] = par
+#     return samples
+
+def MH(par, lnprob, nsteps, t, *args):
     """
     params:
     -------
@@ -215,7 +260,7 @@ def MH(par, nsteps, t, *args):
     samples = np.zeros((nsteps, ndim))
     accept, probs = 0, []
     for i in range(nsteps):
-        par, new_prob, acc = MH_step(par, ndim, t, *args)
+        par, new_prob, acc = MH_step(par, lnprob, ndim, t, *args)
         accept += acc
         probs.append(new_prob)
         samples[i, :] = par
@@ -223,7 +268,7 @@ def MH(par, nsteps, t, *args):
     return samples, par, probs
 
 
-def MH_step(par, ndim, t, *args):
+def MH_step(par, lnprob, ndim, t, *args):
     newp = par + np.random.randn(ndim)*t
     new_lnprob = lnprob(newp, *args)
     alpha = np.exp(new_lnprob)/np.exp(lnprob(par, *args))
@@ -240,13 +285,13 @@ def MH_step(par, ndim, t, *args):
     return par, new_lnprob, accept
 
 
-def run_MCMC(params, mods, d, i, g, star_number, nsteps, t):
+def run_MCMC(params, mods, lnprob, d, i, g, star_number, nsteps, t):
     """
     Run the MCMC for a given set of parameters.
     """
     p0, args, t = assign_args(params, mods, t, d, i, g, star_number)
     assert np.isfinite(lnprob(p0, *args))
-    return MH(p0, nsteps, t, *args)
+    return MH(p0, lnprob, nsteps, t, *args)
 
 
 def gibbs_control(par, mods, d, nsteps, niter, t):
@@ -281,16 +326,16 @@ def gibbs_control(par, mods, d, nsteps, niter, t):
     _set, probs = 0, []
     for i in range(niter):
         # First sample all the parameters.
-        samples, last_sample, pb = run_MCMC(par, mods, d, True, True,
+        samples, last_sample, pb = run_MCMC(par, mods, lnprob, d, True, True,
                                                None, nsteps, t)
         all_samples[nsteps*_set:nsteps*(_set+1):] = samples
         probs.append(pb)
 
         # Then sample the gyro parameters only.
         _set += 1
-        gyro_samples, last_gyro_sample, pb = run_MCMC(last_sample, mods, d,
-                                                         False, True, None,
-                                                         nsteps, t)
+        gyro_samples, last_gyro_sample, pb = run_MCMC(last_sample, mods,
+                                                      lnprob, d, False, True,
+                                                      None, nsteps, t)
         all_samples[nsteps*_set:(_set+1)*nsteps, :3] = gyro_samples[:, :3]
         all_samples[nsteps*_set:(_set+1)*nsteps, 3+nstars:3+2*nstars] = \
             gyro_samples[:, 3:]
@@ -304,8 +349,8 @@ def gibbs_control(par, mods, d, nsteps, niter, t):
         single_last_samps = []
         _set += 1
         for i in range(nstars):
-            samps, last_samp, pb = run_MCMC(last_sample, mods, d, True,
-                                               False, i, nsteps, t)
+            samps, last_samp, pb = run_MCMC(last_sample, mods, lnprob, d,
+                                            True, False, i, nsteps, t)
             single_last_samps.append(last_samp)
             all_samples[_set*nsteps:(_set+1)*nsteps, 3+i::nstars] = samps
             probs.append(pb)
