@@ -197,51 +197,6 @@ def assign_args(p0, mods, t, d, i, g, star_number, all_pars=False,
     return p0, args, t
 
 
-def my_MH(par, lnlike, N, t, *args):
-    """
-    params:
-    -------
-    par: (list)
-        The parameters.
-    x, y, yerr: (arrays)
-        The data
-    N: (int)
-        Number of samples.
-    t: (float)
-        The std of the proposal distribution.
-    """
-    x, y, yerr = args
-    samples = np.zeros((N, len(par)))
-    for i in range(N):
-        newp = par + np.random.randn(len(par))*t
-        alpha = np.exp(lnlike(newp, x, y, yerr))/np.exp(lnlike(par, x, y,
-                                                               yerr))
-        if alpha > 1:
-            par = newp*1
-        else:
-            u = np.random.uniform(0, 1)
-            if alpha > u:
-                par = newp*1
-        samples[i, :] = par
-    return samples
-
-
-# def my_MH(par, lnprob, N, t, *args):
-#     x, y, yerr = args
-#     samples = np.zeros((N, len(par)))
-#     for i in range(N):
-#         newp = par + np.random.randn(len(par))*t
-#         alpha = np.exp(lnprob(newp, x, y, yerr))/np.exp(lnprob(par, x, y,
-#                                                                yerr))
-#         if alpha > 1:
-#             par = newp*1
-#         else:
-#             u = np.random.uniform(0, 1)
-#             if alpha > u:
-#                 par = newp*1
-#         samples[i, :] = par
-#     return samples
-
 def MH(par, lnprob, nsteps, t, *args):
     """
     params:

@@ -2,7 +2,11 @@
 Some utility functions used by chronometer.
 """
 
+import os
 import numpy as np
+import pandas as pd
+from isochrones import StarModel
+from isochrones.mist import MIST_Isochrone
 
 def replace_nans_with_inits(data):
     """
