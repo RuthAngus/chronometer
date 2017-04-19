@@ -18,7 +18,7 @@ def lnlike(par, x, y, yerr):
     return sum(-.5*((y_mod - y)/yerr)**2)
 
 
-def MH(par, N, t, x, y, yerr):
+def MH(par, lnlike, N, t, *args):
     """
     params:
     -------
@@ -31,6 +31,7 @@ def MH(par, N, t, x, y, yerr):
     t: (float)
         The std of the proposal distribution.
     """
+    x, y, yerr = args
     samples = np.zeros((N, len(par)))
     for i in range(N):
         newp = par + np.random.randn(len(par))*t
@@ -63,7 +64,8 @@ if __name__ == "__main__":
     N = 1000000  # N samples
     pars = [.5, 2.5]  # initialisation
     t = .01
-    samples = MH(pars, N, t, x, y, yerr)
+    args = [x, y, yerr]
+    samples, par, probs = gc.MH(pars, lnlike, N, t, *args)
 
     results = [np.percentile(samples[:, i], 50) for i in range(2)]
 
@@ -72,5 +74,5 @@ if __name__ == "__main__":
     plt.plot(x, results[0]*y + results[1])
     plt.savefig("test")
 
-    fig = corner.corner(samples, truths=[2.5, .7], labels=["m", "c"])
+    fig = corner.corner(samples, truths=[.7, 2.5], labels=["m", "c"])
     fig.savefig("corner_MH_test")
