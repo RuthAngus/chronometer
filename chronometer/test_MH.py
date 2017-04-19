@@ -18,37 +18,7 @@ def lnlike(par, x, y, yerr):
     return sum(-.5*((y_mod - y)/yerr)**2)
 
 
-def MH(par, lnlike, N, t, *args):
-    """
-    params:
-    -------
-    par: (list)
-        The parameters.
-    x, y, yerr: (arrays)
-        The data
-    N: (int)
-        Number of samples.
-    t: (float)
-        The std of the proposal distribution.
-    """
-    x, y, yerr = args
-    samples = np.zeros((N, len(par)))
-    for i in range(N):
-        newp = par + np.random.randn(len(par))*t
-        alpha = np.exp(lnlike(newp, x, y, yerr))/np.exp(lnlike(par, x, y,
-                                                               yerr))
-        if alpha > 1:
-            par = newp*1
-        else:
-            u = np.random.uniform(0, 1)
-            if alpha > u:
-                par = newp*1
-        samples[i, :] = par
-    return samples
-
-
-if __name__ == "__main__":
-
+def test_metropolis_hastings():
     # Straight line model
     x = np.arange(0, 10, .1)
     err = 2.
@@ -63,16 +33,24 @@ if __name__ == "__main__":
     print("Running Metropolis Hastings")
     N = 1000000  # N samples
     pars = [.5, 2.5]  # initialisation
-    t = .01
+    t = [.01, .01]
     args = [x, y, yerr]
     samples, par, probs = gc.MH(pars, lnlike, N, t, *args)
 
     results = [np.percentile(samples[:, i], 50) for i in range(2)]
+    upper = [np.percentile(samples[:, i], 64) for i in range(2)]
+    lower = [np.percentile(samples[:, i], 15) for i in range(2)]
 
-    plt.clf()
-    plt.errorbar(x, y, yerr=yerr, fmt="k.")
-    plt.plot(x, results[0]*y + results[1])
-    plt.savefig("test")
+    print(lower, "lower")
+    print(results, "results")
+    print(upper, "upper")
+    assert lower < results
+    assert results < upper
 
-    fig = corner.corner(samples, truths=[.7, 2.5], labels=["m", "c"])
-    fig.savefig("corner_MH_test")
+    # plt.clf()
+    # plt.errorbar(x, y, yerr=yerr, fmt="k.")
+    # plt.plot(x, results[0]*y + results[1])
+    # plt.savefig("test")
+
+    # fig = corner.corner(samples, truths=[.7, 2.5], labels=["m", "c"])
+    # fig.savefig("corner_MH_test")
