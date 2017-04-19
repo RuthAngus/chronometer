@@ -130,6 +130,7 @@ class ChronometerTestCase(unittest.TestCase):
         self.assertTrue(ndim == nd)
 
     def test_run_MCMC_sample_shape(self):
+        print("Test 8")
         samps, last_samp = gc.run_MCMC(p0, mods, d, True, True, None, 10,
                                        1e-2)
         self.assertTrue(np.shape(samps) == (10, 18))
@@ -144,8 +145,18 @@ class ChronometerTestCase(unittest.TestCase):
         self.assertTrue(len(last_samp) == 6)
 
     def test_gibbs_control(self):
+        print("Test 9")
         samples = gc.gibbs_control(p0, mods, d, 5, 1, 1e-2)
         print(np.shape(samples))
+
+    def test_iso_lnlike_one_star(self):
+        """
+        Test the iso_lnlike function works on one star.
+        """
+        print("Test 10")
+        params, args = gc.assign_args(p0, mods, d, True, False, 0)
+        self.assertTrue(np.isfinite(gc.iso_lnlike(params, args[0],
+                                                  all_params=False)))
 
 
 if __name__ == "__main__":
