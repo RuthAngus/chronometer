@@ -50,14 +50,6 @@ class ChronometerTestCase(unittest.TestCase):
                 d.bv.values, d.bv_err.values, "both"]
         self.assertTrue(np.isfinite((gc.lnprob(p0, *args))))
 
-    def test_iso_single_lnlike_returns_finite(self):
-        """
-        Make sure iso_single_lnlike_returns_finite.
-        """
-        print("Test 3")
-        self.assertTrue(np.isfinite((gc.iso_single_lnlike(one_star_pars,
-                                                          mods[0]))))
-
     def test_lnprior_returns_finite(self):
         """
         Make sure lnprior returns a finite number.
@@ -124,39 +116,52 @@ class ChronometerTestCase(unittest.TestCase):
         p0, args = gc.assign_args(params, mods, d, i, g, star_number,
                                   verbose=False)
         N, nd = 100, 3 + 5*3
-        samples, par = gc.MH(p0, N, .01, *args)
+        samples, par, probs = gc.MH(p0, N, .01, *args)
         nsteps, ndim = np.shape(samples)
         self.assertTrue(nsteps == N)
         self.assertTrue(ndim == nd)
 
     def test_run_MCMC_sample_shape(self):
         print("Test 8")
-        samps, last_samp = gc.run_MCMC(p0, mods, d, True, True, None, 10,
-                                       1e-2)
+        samps, last_samp, probs = gc.run_MCMC(p0, mods, d, True, True, None,
+                                              10, 1e-2)
         self.assertTrue(np.shape(samps) == (10, 18))
         self.assertTrue(len(last_samp) == 18)
-        samps, last_samp = gc.run_MCMC(p0, mods, d, True, False, 0, 10,
-                                       1e-2)
+        samps, last_samp, probs = gc.run_MCMC(p0, mods, d, True, False, 0,
+                                              10, 1e-2)
         self.assertTrue(np.shape(samps) == (10, 5))
         self.assertTrue(len(last_samp) == 5)
-        samps, last_samp = gc.run_MCMC(p0, mods, d, False, True, None, 10,
-                                       1e-2)
+        samps, last_samp, probs = gc.run_MCMC(p0, mods, d, False, True, None,
+                                              10, 1e-2)
         self.assertTrue(np.shape(samps) == (10, 6))
         self.assertTrue(len(last_samp) == 6)
 
     def test_gibbs_control(self):
         print("Test 9")
-        samples = gc.gibbs_control(p0, mods, d, 5, 1, 1e-2)
+        nsteps, niter = 5, 1
+        samples, lnprobs = gc.gibbs_control(p0, mods, d, nsteps, niter, 1e-2)
         print(np.shape(samples))
+        print(np.shape(lnprobs))
 
     def test_iso_lnlike_one_star(self):
         """
         Test the iso_lnlike function works on one star.
         """
         print("Test 10")
-        params, args = gc.assign_args(p0, mods, d, True, False, 0)
+        params, args = gc.assign_args(p0, mods, d, True, False, 0,
+                                      verbose=False)
         self.assertTrue(np.isfinite(gc.iso_lnlike(params, args[0],
                                                   all_params=False)))
+
+
+    def test_MH_step_prob_increase(self):
+        params, args = gc.assign_args(p0, mods, d, True, True, None,
+                                      verbose=False)
+        params, old_lnprob, accept = gc.MH_step(params, len(params), 0.,
+                                                *args)
+        params[6] = np.log(5)
+        par, new_lnprob, accept = gc.MH_step(params, len(params), 0., *args)
+        self.assertTrue(new_lnprob < old_lnprob)
 
 
 if __name__ == "__main__":
