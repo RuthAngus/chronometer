@@ -20,7 +20,8 @@ import priors
 from models import gc_model
 
 import teff_bv as tbv
-from utils import replace_nans_with_inits, vk2teff, make_param_dict
+from utils import replace_nans_with_inits, vk2teff, make_param_dict, \
+    parameter_assignment, pars_and_mods, transform_parameters
 
 plotpar = {'axes.labelsize': 18,
            'font.size': 10,
@@ -46,31 +47,6 @@ def gc_lnlike(params, period, period_errs, bv, bv_errs, all_params=False):
     pars, ln_ages = transform_parameters(params, "gyro", all_params)
     model_periods = gc_model(pars, ln_ages, bv)
     return sum(-.5*((period - model_periods)/period_errs)**2)
-
-
-def transform_parameters(lnparams, indicator, all_params):
-    if indicator == "gyro":
-        if all_params:
-            N = int((len(lnparams) - 3)/5)
-            pars = lnparams[:3]
-            ln_ages = lnparams[3+N:3+2*N]
-        else:
-            pars = lnparams[:3]
-            ln_ages = lnparams[3:]
-        return pars, ln_ages
-    elif indicator == "iso":
-        if all_params:
-            p = lnparams[3:]*1
-        else:
-            p = lnparams*1
-        N = int(len(p)/5)
-
-        # Transform to linear space
-        # mass, age, feh, distance, Av
-        p[:N] = np.exp(p[:N])
-        p[N:2*N] = np.log10(1e9*np.exp(p[N:2*N]))
-        p[3*N:4*N] = np.exp(p[3*N:4*N])
-        return p, N
 
 
 def iso_lnlike(lnparams, mods, all_params=False):
@@ -220,55 +196,6 @@ def assign_args(p0, mods, d, i, g, star_number, all_pars=False, verbose=True):
     return p0, args
 
 
-def pars_and_mods(DATA_DIR):
-    """
-    Create the initial parameter array and the mod objects needed for
-    isochrones.py
-    """
-    # The initial parameters
-    gc = np.array([.7725, .601, .5189])
-    d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
-
-    d = replace_nans_with_inits(d)
-    p0 = np.concatenate((gc, np.log(d.mass.values),
-                         np.log(d.age.values), d.feh.values,
-                         np.log(1./d.parallax.values*1e3),
-                         d.Av.values))
-
-    # iso_lnlike preamble - make a list of 'mod' objects: one for each star.
-    mist = MIST_Isochrone()
-    mods = []
-    for i in range(len(d.period.values)):
-        param_dict = make_param_dict(d, i)
-
-        # Remove missing parameters from the dict.
-        param_dict = {k: param_dict[k] for k in param_dict if
-                      np.isfinite(param_dict[k]).all()}
-        mods.append(StarModel(mist, **param_dict))
-    return p0, mods
-
-
-def parameter_assignment(params, indicator):
-    """
-    Take the parameter array and split it into groups of parameters.
-    """
-    if indicator == "iso":
-        N = int(len(params)/5.) # number of stars
-        ln_mass = params[:N]  # parameter assignment
-        ln_age = params[N:2*N]
-        feh = params[2*N:3*N]
-        ln_distance = params[3*N:4*N]
-        Av = params[4*N:5*N]
-    elif indicator == "both":
-        N = int(len(params[3:])/5)  # number of stars
-        ln_mass = params[3:3+N]  # parameter assignment
-        ln_age = params[3+N:3+2*N]
-        feh = params[3+2*N:3+3*N]
-        ln_distance = params[3+3*N:3+4*N]
-        Av = params[3+4*N:3+5*N]
-    return N, ln_mass, ln_age, feh, ln_distance, Av
-
-
 def emc(p0, args, nwalkers, nsteps, burnin):
     """
     Run emcee for a set of parameters.
@@ -341,10 +268,14 @@ def gibbs_control(par, mods, d, nsteps, niter, t):
     ------
     par: (list)
         The parameters.
+    mods: (list)
+        The list of starmodel objects.
     d: (pandas.dataframe)
         The data.
     nsteps: (int)
         Number of samples.
+    niter: (int)
+        The number of gibbs cycles to perform.
     t: (float)
         The std of the proposal distribution.
     returns:
@@ -412,7 +343,7 @@ if __name__ == "__main__":
 
     start = time.time()  # timeit
 
-    nsteps, niter, t = 50000, 10, 1e-2
+    nsteps, niter, t = 50000, 20, 1e-2
     flat = gibbs_control(params, mods, d, nsteps, niter, t)
 
     end = time.time()
