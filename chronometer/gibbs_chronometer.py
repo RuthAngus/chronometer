@@ -157,7 +157,8 @@ def plot_gyro_result(flat, params_init, i, g):
     plt.savefig("period_age_data")
 
 
-def assign_args(p0, mods, d, i, g, star_number, all_pars=False, verbose=True):
+def assign_args(p0, mods, t, d, i, g, star_number, all_pars=False,
+                verbose=True):
     """
     Create the parameter and mod arrays needed to specify whether global or
     individual parameters will be sampled.
@@ -178,6 +179,7 @@ def assign_args(p0, mods, d, i, g, star_number, all_pars=False, verbose=True):
             print("gyro")
         N = len(d.age.values)
         p0 = np.concatenate((p0[:3], p0[3+N:3+2*N]))
+        t = np.concatenate((t[:3], t[3+N:3+2*N]))
         args = [d.period.values, d.period_err.values, d.bv.values,
                 d.bv_err.values, "gyro"]
     elif i and not g:  # If Iso inference.
@@ -185,12 +187,14 @@ def assign_args(p0, mods, d, i, g, star_number, all_pars=False, verbose=True):
             print("iso", star_number)
         if not all_pars:
             p0 = p0[3:]
+            t = t[3:]
         if star_number is not None:
             Nstars = int(len(p0)/5.)
             p0 = p0[star_number::Nstars]
+            t = t[star_number::Nstars]
             mods = [mods[star_number]]
         args = [mods, "iso"]
-    return p0, args
+    return p0, args, t
 
 
 def MH(par, nsteps, t, *args):
@@ -209,37 +213,38 @@ def MH(par, nsteps, t, *args):
     """
     ndim = len(par)
     samples = np.zeros((nsteps, ndim))
-    accept, probs = [], []
+    accept, probs = 0, []
     for i in range(nsteps):
-        par, new_prob = MH_step()
+        par, new_prob, acc = MH_step(par, ndim, t, *args)
+        accept += acc
         probs.append(new_prob)
         samples[i, :] = par
-    print("Acceptance fraction = ", float(sum(accept))/len(accept))
+    print("Acceptance fraction = ", accept/float(nsteps))
     return samples, par, probs
 
 
-def MH_step(par, ndim, *args):
+def MH_step(par, ndim, t, *args):
     newp = par + np.random.randn(ndim)*t
-    new_prob = np.exp(lnprob(newp, *args))
-    alpha = new_prob/np.exp(lnprob(par, *args))
+    new_lnprob = lnprob(newp, *args)
+    alpha = np.exp(new_lnprob)/np.exp(lnprob(par, *args))
     if alpha > 1:
         par = newp*1
-        accept.append(1)
+        accept = 1
     else:
         u = np.random.uniform(0, 1)
         if alpha > u:
             par = newp*1
-            accept.append(1)
+            accept = 1
         else:
-            accept.append(0)
-    return par, new_prob
+            accept = 0
+    return par, new_lnprob, accept
 
 
 def run_MCMC(params, mods, d, i, g, star_number, nsteps, t):
     """
     Run the MCMC for a given set of parameters.
     """
-    p0, args = assign_args(params, mods, d, i, g, star_number)
+    p0, args, t = assign_args(params, mods, t, d, i, g, star_number)
     assert np.isfinite(lnprob(p0, *args))
     return MH(p0, nsteps, t, *args)
 
@@ -326,7 +331,9 @@ if __name__ == "__main__":
 
     start = time.time()  # timeit
 
-    nsteps, niter, t = 100, 2, 1e-2
+    t = [.01, .01, .01, .03, .1, .1, .3, .3, .3, .1, .2, .2, .02, .2, .2, .01,
+         .2, .2]
+    nsteps, niter = 1000, 3
     flat, lnprobs = gibbs_control(params, mods, d, nsteps, niter, t)
 
     end = time.time()

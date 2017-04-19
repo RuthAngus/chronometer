@@ -113,7 +113,9 @@ class ChronometerTestCase(unittest.TestCase):
         print("Test 7")
         i, g, star_number = True, True, None
         params, mods = gc.pars_and_mods(DATA_DIR)
-        p0, args = gc.assign_args(params, mods, d, i, g, star_number,
+        t = [.01, .01, .01, .03, .1, .1, .3, .3, .3, .1, .2, .2, .02, .2, .2,
+             .01, .2, .2]
+        p0, args = gc.assign_args(params, mods, t, d, i, g, star_number,
                                   verbose=False)
         N, nd = 100, 3 + 5*3
         samples, par, probs = gc.MH(p0, N, .01, *args)
@@ -148,14 +150,18 @@ class ChronometerTestCase(unittest.TestCase):
         Test the iso_lnlike function works on one star.
         """
         print("Test 10")
-        params, args = gc.assign_args(p0, mods, d, True, False, 0,
+        t = [.01, .01, .01, .03, .1, .1, .3, .3, .3, .1, .2, .2, .02, .2, .2,
+             .01, .2, .2]
+        params, args = gc.assign_args(p0, mods, t, d, True, False, 0,
                                       verbose=False)
         self.assertTrue(np.isfinite(gc.iso_lnlike(params, args[0],
                                                   all_params=False)))
 
 
     def test_MH_step_prob_increase(self):
-        params, args = gc.assign_args(p0, mods, d, True, True, None,
+        t = [.01, .01, .01, .03, .1, .1, .3, .3, .3, .1, .2, .2, .02, .2, .2,
+             .01, .2, .2]
+        params, args = gc.assign_args(p0, mods, t, d, True, True, None,
                                       verbose=False)
         params, old_lnprob, accept = gc.MH_step(params, len(params), 0.,
                                                 *args)
