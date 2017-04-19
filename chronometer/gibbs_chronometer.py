@@ -9,12 +9,9 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import scipy.misc as spm
 from isochrones import StarModel
 from isochrones.mist import MIST_Isochrone
 
-from simple_gibbs import gibbs
-import emcee
 import corner
 import priors
 from models import gc_model
@@ -196,27 +193,6 @@ def assign_args(p0, mods, d, i, g, star_number, all_pars=False, verbose=True):
     return p0, args
 
 
-def emc(p0, args, nwalkers, nsteps, burnin):
-    """
-    Run emcee for a set of parameters.
-    Try by first running on individual stars, cycle through.
-    Then just run the global parameters, then run all.
-    Use emcee for now.
-    """
-    ndim = len(p0)
-    p0 = [1e-4*np.random.rand(ndim) + p0 for i in range(nwalkers)]
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=args)
-    print("burning in...")
-    pos, _, _ = sampler.run_mcmc(p0, burnin)
-    sampler.reset()
-    print("production run...")
-    sampler.run_mcmc(pos, nsteps)
-    end = time.time()
-    print("Time taken = ", (end - start)/60., "mins")
-    flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
-    return flat
-
-
 def MH(par, nsteps, t, *args):
     """
     params:
@@ -233,23 +209,30 @@ def MH(par, nsteps, t, *args):
     """
     ndim = len(par)
     samples = np.zeros((nsteps, ndim))
-    accept = []
+    accept, probs = [], []
     for i in range(nsteps):
-        newp = par + np.random.randn(ndim)*t
-        alpha = np.exp(lnprob(newp, *args))/np.exp(lnprob(par, *args))
-        if alpha > 1:
+        par, new_prob = MH_step()
+        probs.append(new_prob)
+        samples[i, :] = par
+    print("Acceptance fraction = ", float(sum(accept))/len(accept))
+    return samples, par, probs
+
+
+def MH_step(par, ndim, *args):
+    newp = par + np.random.randn(ndim)*t
+    new_prob = np.exp(lnprob(newp, *args))
+    alpha = new_prob/np.exp(lnprob(par, *args))
+    if alpha > 1:
+        par = newp*1
+        accept.append(1)
+    else:
+        u = np.random.uniform(0, 1)
+        if alpha > u:
             par = newp*1
             accept.append(1)
         else:
-            u = np.random.uniform(0, 1)
-            if alpha > u:
-                par = newp*1
-                accept.append(1)
-            else:
-                accept.append(0)
-        samples[i, :] = par
-    print("Acceptance fraction = ", float(sum(accept))/len(accept))
-    return samples, par
+            accept.append(0)
+    return par, new_prob
 
 
 def run_MCMC(params, mods, d, i, g, star_number, nsteps, t):
@@ -290,23 +273,23 @@ def gibbs_control(par, mods, d, nsteps, niter, t):
     all_samples = np.zeros((nsteps * n_parameter_sets * niter, ndim))
 
     # Iterate over niter cycles of parameter sets.
-    _set = 0
+    _set, probs = 0, []
     for i in range(niter):
-        print("set", _set)
         # First sample all the parameters.
-        samples, last_sample = run_MCMC(par, mods, d, True, True, None,
-                                        nsteps, t)
+        samples, last_sample, pb = run_MCMC(par, mods, d, True, True,
+                                               None, nsteps, t)
         all_samples[nsteps*_set:nsteps*(_set+1):] = samples
+        probs.append(pb)
 
         # Then sample the gyro parameters only.
         _set += 1
-        print("set", _set)
-        gyro_samples, last_gyro_sample = run_MCMC(last_sample, mods, d,
-                                                  False, True, None, nsteps,
-                                                  t)
+        gyro_samples, last_gyro_sample, pb = run_MCMC(last_sample, mods, d,
+                                                         False, True, None,
+                                                         nsteps, t)
         all_samples[nsteps*_set:(_set+1)*nsteps, :3] = gyro_samples[:, :3]
         all_samples[nsteps*_set:(_set+1)*nsteps, 3+nstars:3+2*nstars] = \
             gyro_samples[:, 3:]
+        probs.append(pb)
 
         # Replace parameter array with the last sample from gyro.
         last_sample[:3] = last_gyro_sample[:3]
@@ -315,21 +298,21 @@ def gibbs_control(par, mods, d, nsteps, niter, t):
         # Then sample the stars, one by one.
         single_last_samps = []
         _set += 1
-        print("set", _set)
         for i in range(nstars):
-            samps, last_samp = run_MCMC(last_sample, mods, d, True, False, i,
-                                        nsteps, t)
+            samps, last_samp, pb = run_MCMC(last_sample, mods, d, True,
+                                               False, i, nsteps, t)
             single_last_samps.append(last_samp)
             all_samples[_set*nsteps:(_set+1)*nsteps, 3+i::nstars] = samps
+            probs.append(pb)
             _set += 1
-            print("set", _set)
 
         # Replace parameter array with the last sample from single star iso.
         for i in range(nstars):
             last_sample[3+i::nstars] = single_last_samps[i]
         print("last_sample = ", last_sample)
 
-    return all_samples
+    lnprobs = np.array([i for j in probs for i in j])
+    return all_samples, lnprobs
 
 
 if __name__ == "__main__":
@@ -343,8 +326,8 @@ if __name__ == "__main__":
 
     start = time.time()  # timeit
 
-    nsteps, niter, t = 50000, 20, 1e-2
-    flat = gibbs_control(params, mods, d, nsteps, niter, t)
+    nsteps, niter, t = 100, 2, 1e-2
+    flat, lnprobs = gibbs_control(params, mods, d, nsteps, niter, t)
 
     end = time.time()
     print("Time taken = ", (end - start)/60, "minutes")
@@ -355,6 +338,11 @@ if __name__ == "__main__":
     fig.savefig("corner_gibbs_for_realz")
 
     print("Plotting results and traces")
+    plt.clf()
+    plt.plot(lnprobs)
+    plt.xlabel("Time")
+    plt.ylabel("ln (probability)")
+    plt.savefig("prob_trace")
     # plot_gyro_result(flat, params_init, i, g)
 
     # # Plot probability
