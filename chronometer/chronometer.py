@@ -29,7 +29,7 @@ plotpar = {'axes.labelsize': 18,
 plt.rcParams.update(plotpar)
 
 
-def lnlike(params, *args)
+def lnlike(params, *args):
     """
     Probability of age and model parameters given rotation period and colour.
     parameters:
@@ -39,20 +39,41 @@ def lnlike(params, *args)
     par_inds: (array)
         The parameters to vary.
     """
-    par_inds = args[-1]
-    if par_inds[:3] == np.array([0, 1, 2]):
-        pars = params[par_inds]
-        ln_ages = pars[3:]
-        period, period_errs, bv, bv_errs = args
-        model_periods = gyro_model(params, bv)
-        return sum(-.5*((period - model_periods)/period_errs)**2)
-    else:
-        mods = args[par_inds]
-        if len(mods) > 1:
-            ll = [mods[i].lnlike(p[i::N]) for i in range(len((mods)))]
-        return sum(ll)
+    mods, period, period_errs, bv, bv_errs, par_inds = args
+    N = int((len(params) - 3)/5.)
+    print(N, "N")
+    gyro_lnlike, iso_lnlike = 0, 0
+    if par_inds[0] == 0 and par_inds[1] == 1 and par_inds[2] == 2: # if gyro.
+        if len(par_inds) == 3 + N:  # If just gyro.
+            gyro_lnlike =  sum(-.5*((period - gyro_model(params[par_inds],
+                                                bv))/period_errs)**2)
+        elif len(par_inds) == 3 + 5*N:  # If gyro and all stars.
+            g_par_inds = np.concatenate((par_inds[:3], par_inds[3+N:3+2*N]))
+            gyro_lnlike =  sum(-.5*((period - gyro_model(params[g_par_inds],
+                                                bv))/period_errs)**2)
+            p = params*1
+            p[3:3+N] = np.exp(p[:N])
+            p[3+N:3+2*N] = np.log10(1e9*np.exp(p[N:2*N]))
+            p[3+3*N:3+4*N] = np.exp(p[3*N:4*N])
+            iso_lnlike = [mods[i].lnlike(params[par_inds][3+i::N]) for i in
+                          range(len((mods)))]
         else:
-            return mods[0].lnlike(p)
+            assert len(par_inds) - 3 - N == 0  # Not gyro + single stars.
+    else:  # If not gyro but single stars
+        print("yes")
+        mod_inds = par_inds[0] - 3
+        print(mod_inds)
+        ms = mods[mod_inds]
+        print(ms)
+        # try:
+        #     if len(ms) > 1:
+        #         print(params[par_inds][i::N])
+        #         iso_lnlike = [ms[i].lnlike(params[par_inds][i::N]) for i in
+        #                     range(len((ms)))]
+        # except TypeError:
+        print(params[par_inds])
+        iso_lnlike = ms.lnlike(params[par_inds])
+    return gyro_lnlike + iso_lnlike
 
 
 def lnprior(params):
@@ -117,7 +138,7 @@ def MH(par, lnprob, nsteps, t, *args):
 
 
 def MH_step(par, lnprob, t, *args):
-    newp = par + np.random.randn(ndim)*t
+    newp = par + np.random.randn(len(par))*t
     new_lnprob = lnprob(newp, *args)
     alpha = np.exp(new_lnprob)/np.exp(lnprob(par, *args))
     if alpha > 1:
@@ -145,15 +166,17 @@ def gibbs_control(par, mods, d, nsteps, niter, t):
     gyro_par_inds = np.concatenate((par_inds[:3], par_inds[3+N:3+2*N]))
     iso_par_inds = []
     for i in range(N):
-        iso_par_inds.append(all_par_inds[3+i::N])
+        iso_par_inds.append(par_inds[3+i::N])
 
-    args = [mods, d.period.values, d.period_err.values, d.bv, d.bv_err.values,
+    args = [mods, d.period.values, d.period_err.values, d.bv.values,
+            d.bv_err.values,
             par_inds]
 
     # Iterate over niter cycles of parameter sets.
     _set, probs = 0, []
     for i in range(niter):
         # First sample all the parameters.
+        args[-1] = par_inds
         samples, par, pb = MH(par, lnprob, nsteps, t, *args)
         all_samples[nsteps*_set:nsteps*(_set+1), :][par_inds] = samples
         probs.append(pb)
