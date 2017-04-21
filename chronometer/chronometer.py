@@ -180,10 +180,7 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
     n_parameter_sets = len(par_inds_list)
 
     # Final sample array
-    skip = 2
-    if len(par_inds_list[0]) == 1:
-        skip = 1
-    all_samples = np.zeros((nsteps * skip * niter, ndim))
+    all_samples = np.zeros((nsteps * 2 * niter, ndim))
 
     assert len(par_inds_list[0]) == len(par), "You should sample all the " \
         "parameters first!"
@@ -198,7 +195,7 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
             args[-1] = par_inds_list[k]
             samples, par, pb = MH(par, lnprob, nsteps, t, *args)
             if len(par_inds_list[k]) == len(par):  # If sampling all params:
-                all_samples[nsteps*i*skip:nsteps*((i*skip)+1),
+                all_samples[nsteps*i*2:nsteps*((i*2)+1),
                             par_inds_list[k]] = samples
             else:  # if sampling (non-overlapping) parameter subsets:
                 all_samples[nsteps*((i*2)+1):nsteps*((i*2)+2),
