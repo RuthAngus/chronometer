@@ -281,14 +281,14 @@ def gibbs_control(par, mods, d, nsteps, niter, t):
     _set, probs = 0, []
     for i in range(niter):
         # First sample all the parameters.
-        samples, last_sample, pb = run_MCMC(par, mods, lnprob, d, True, True,
+        samples, par, pb = run_MCMC(par, mods, lnprob, d, True, True,
                                                None, nsteps, t)
         all_samples[nsteps*_set:nsteps*(_set+1):] = samples
         probs.append(pb)
 
         # Then sample the gyro parameters only.
         _set += 1
-        gyro_samples, last_gyro_sample, pb = run_MCMC(last_sample, mods,
+        gyro_samples, last_gyro_sample, pb = run_MCMC(par, mods,
                                                       lnprob, d, False, True,
                                                       None, nsteps, t)
         all_samples[nsteps*_set:(_set+1)*nsteps, :3] = gyro_samples[:, :3]
@@ -297,14 +297,14 @@ def gibbs_control(par, mods, d, nsteps, niter, t):
         probs.append(pb)
 
         # Replace parameter array with the last sample from gyro.
-        last_sample[:3] = last_gyro_sample[:3]
-        last_sample[3+nstars:3+2*nstars] = last_gyro_sample[3:]
+        par[:3] = last_gyro_sample[:3]
+        par[3+nstars:3+2*nstars] = last_gyro_sample[3:]
 
         # Then sample the stars, one by one.
         single_last_samps = []
         _set += 1
         for i in range(nstars):
-            samps, last_samp, pb = run_MCMC(last_sample, mods, lnprob, d,
+            samps, last_samp, pb = run_MCMC(par, mods, lnprob, d,
                                             True, False, i, nsteps, t)
             single_last_samps.append(last_samp)
             all_samples[_set*nsteps:(_set+1)*nsteps, 3+i::nstars] = samps
@@ -313,8 +313,8 @@ def gibbs_control(par, mods, d, nsteps, niter, t):
 
         # Replace parameter array with the last sample from single star iso.
         for i in range(nstars):
-            last_sample[3+i::nstars] = single_last_samps[i]
-        print("last_sample = ", last_sample)
+            par[3+i::nstars] = single_last_samps[i]
+        print("last_sample = ", par)
 
     lnprobs = np.array([i for j in probs for i in j])
     return all_samples, lnprobs

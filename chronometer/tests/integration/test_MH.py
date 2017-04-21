@@ -3,7 +3,7 @@ Test the metropolis hastings algorithm.
 """
 
 import numpy as np
-import gibbs_chronometer as gc
+import step_chronometer as gc
 import matplotlib.pyplot as plt
 import corner
 import emcee

@@ -1,10 +1,9 @@
 """
-Unit tests for chronometer.py
+Unit tests for gibbs_chronometer.py
 """
 
 import os
 import numpy as np
-import pytest
 import gibbs_chronometer as gc
 import pandas as pd
 from isochrones import StarModel
@@ -12,20 +11,10 @@ from isochrones.mist import MIST_Isochrone
 import priors
 
 
-class ChronometerTestCase(object):
+class TestClass:
     """
     Tests for chronometer.py
     """
-
-    def __init__():
-
-        # Global variables.
-        self.DATA_DIR = \
-            "/Users/ruthangus/projects/chronometer/chronometer/data"
-        self.d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
-        self.p0, self.mods = gc.pars_and_mods(DATA_DIR)
-        self.one_star_pars = [np.log(1.), np.log(4.), 0., np.log(1000.), 0.]
-
 
     def test_data_file_validity(self):
         """
@@ -44,10 +33,12 @@ class ChronometerTestCase(object):
                   [0, 5]]
 
         b = True
+        DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
+        d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
         for i, bound in enumerate(bounds):
             b += (bound[0] < \
-                  self.d.iloc[:, i][np.isfinite(self.d.iloc[:, i])]) & \
-                (self.d.iloc[:, i][np.isfinite(self.d.iloc[:, i])] <
+                  d.iloc[:, i][np.isfinite(d.iloc[:, i])]) & \
+                (d.iloc[:, i][np.isfinite(d.iloc[:, i])] <
                  bound[1])
         assert b.all() == True
 
@@ -56,8 +47,11 @@ class ChronometerTestCase(object):
         Make sure lnprob returns finite.
         """
         print("Test 2")
-        args = [self.mods, self.d.period.values, self.d.period_err.values,
-                self.d.bv.values, self.d.bv_err.values, "both"]
+        DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
+        d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
+        p0, mods = gc.pars_and_mods(DATA_DIR)
+        args = [mods, d.period.values, d.period_err.values,
+                d.bv.values, d.bv_err.values, "both"]
         assert (np.isfinite((gc.lnprob(p0, *args)))) == True
 
     def test_lnprior_returns_finite(self):
@@ -65,6 +59,8 @@ class ChronometerTestCase(object):
         Make sure lnprior returns a finite number.
         """
         print("Test 3")
+        DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
+        p0, mods = gc.pars_and_mods(DATA_DIR)
         assert (np.isfinite(gc.lnprior(p0))) == True
 
     def test_parameter_assignment_reasonable(self):
@@ -72,39 +68,44 @@ class ChronometerTestCase(object):
         Test the parameter assignment function.
         """
         print("Test 4")
+        DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
+        p0, mods = gc.pars_and_mods(DATA_DIR)
+        one_star_pars = [np.log(1.), np.log(4.), 0., np.log(1000.), 0.]
         Nstars = 3
         N, ln_mass, ln_age, feh, ln_distance, Av = \
-        gc.parameter_assignment(self.p0[3:], "iso")
+        gc.parameter_assignment(p0[3:], "iso")
         assert (N == len(ln_mass)) == True
         assert (type(N) == int) == True
         assert (Nstars == N) == True
 
         N, ln_mass, ln_age, feh, ln_distance, Av = \
-            gc.parameter_assignment(self.p0, "both")
+            gc.parameter_assignment(p0, "both")
         assert (N == len(ln_mass)) == True
         assert (type(N) == int) == True
         assert (Nstars == N) == True
 
         N, ln_mass, ln_age, feh, ln_distance, Av = \
-            gc.parameter_assignment(self.one_star_pars, "both")
+            gc.parameter_assignment(one_star_pars, "both")
         assert (type(N) == int) == True
 
     def test_transform_parameters_correct(self):
         """
         Test the transform parameters function.
         """
+        DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
+        p0, mods = gc.pars_and_mods(DATA_DIR)
         print("Test 5")
         Nstars = 3
-        p, N = gc.transform_parameters(self.p0[3:], "iso", False)
+        p, N = gc.transform_parameters(p0[3:], "iso", False)
         assert (len(p) == Nstars*5) == True
         assert (Nstars == N) == True
-        p, N = gc.transform_parameters(self.p0, "iso", True)
+        p, N = gc.transform_parameters(p0, "iso", True)
         assert (len(p == Nstars*5))
         assert (Nstars == N) == True
-        pars, lnages = gc.transform_parameters(self.p0[:6], "gyro", False)
+        pars, lnages = gc.transform_parameters(p0[:6], "gyro", False)
         assert (len(pars) == 3) == True
         assert (len(lnages) == Nstars) == True
-        pars, lnages = gc.transform_parameters(self.p0, "gyro", True)
+        pars, lnages = gc.transform_parameters(p0, "gyro", True)
         assert (len(pars) == 3) == True
         assert (len(lnages) == Nstars) == True
 
@@ -113,7 +114,8 @@ class ChronometerTestCase(object):
         Test the iso_lnprior function works on one star.
         """
         print("Test 6")
-        assert (np.isfinite(gc.iso_lnprior(np.array(self.one_star_pars)))) \
+        one_star_pars = [np.log(1.), np.log(4.), 0., np.log(1000.), 0.]
+        assert (np.isfinite(gc.iso_lnprior(np.array(one_star_pars)))) \
             == True
 
     def test_mh_correct_size(self):
@@ -123,10 +125,12 @@ class ChronometerTestCase(object):
         """
         print("Test 7")
         i, g, star_number = True, True, None
+        DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
+        d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
         params, mods = gc.pars_and_mods(DATA_DIR)
         t = [.01, .01, .01, .03, .1, .1, .3, .3, .3, .1, .2, .2, .02, .2, .2,
              .01, .2, .2]
-        p0, args = gc.assign_args(params, self.mods, t, self.d, i, g,
+        p0, args = gc.assign_args(params, mods, t, d, i, g,
                                   star_number, verbose=False)
         N, nd = 100, 3 + 5*3
         samples, par, probs = gc.MH(p0, N, .01, *args)
@@ -136,23 +140,29 @@ class ChronometerTestCase(object):
 
     def test_run_MCMC_sample_shape(self):
         print("Test 8")
-        samps, last_samp, probs = gc.run_MCMC(self.p0, self.mods, self.d,
+        DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
+        d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
+        p0, mods = gc.pars_and_mods(DATA_DIR)
+        samps, last_samp, probs = gc.run_MCMC(p0, mods, d,
                                               True, True, None, 10, 1e-2)
         assert (np.shape(samps) == (10, 18)) == True
         assert (len(last_samp) == 18) == True
-        samps, last_samp, probs = gc.run_MCMC(self.p0, self.mods, self.d,
+        samps, last_samp, probs = gc.run_MCMC(p0, mods, d,
                                               True, False, 0, 10, 1e-2)
         assert (np.shape(samps) == (10, 5)) == True
         assert (len(last_samp) == 5) == True
-        samps, last_samp, probs = gc.run_MCMC(self.p0, self.mods, self.d,
+        samps, last_samp, probs = gc.run_MCMC(p0, mods, d,
                                               False, True, None, 10, 1e-2)
         assert (np.shape(samps) == (10, 6)) == True
         assert (len(last_samp) == 6) == True
 
     def test_gibbs_control(self):
         print("Test 9")
+        DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
+        d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
+        p0, mods = gc.pars_and_mods(DATA_DIR)
         nsteps, niter = 5, 1
-        samples, lnprobs = gc.gibbs_control(self.p0, self.mods, self.d,
+        samples, lnprobs = gc.gibbs_control(p0, mods, d,
                                             nsteps, niter, 1e-2)
         print(np.shape(samples))
         print(np.shape(lnprobs))
@@ -161,19 +171,25 @@ class ChronometerTestCase(object):
         """
         Test the iso_lnlike function works on one star.
         """
+        DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
+        d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
+        p0, mods = gc.pars_and_mods(DATA_DIR)
         print("Test 10")
         t = [.01, .01, .01, .03, .1, .1, .3, .3, .3, .1, .2, .2, .02, .2, .2,
              .01, .2, .2]
-        params, args = gc.assign_args(self.p0, self.mods, t, self.d, True,
+        params, args = gc.assign_args(p0, mods, t, d, True,
                                       False, 0, verbose=False)
         assert (np.isfinite(gc.iso_lnlike(params, args[0],
                                           all_params=False))) == True
 
 
     def test_MH_step_prob_increase(self):
+        DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
+        d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
+        p0, mods = gc.pars_and_mods(DATA_DIR)
         t = [.01, .01, .01, .03, .1, .1, .3, .3, .3, .1, .2, .2, .02, .2, .2,
              .01, .2, .2]
-        params, args = gc.assign_args(self.p0, self.mods, t, self.d, True,
+        params, args = gc.assign_args(p0, mods, t, d, True,
                                       True, None, verbose=False)
         params, old_lnprob, accept = gc.MH_step(params, len(params), 0.,
                                                 *args)

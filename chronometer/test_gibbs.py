@@ -26,10 +26,23 @@ def lnlike(par, x, y, yerr, par_inds):
     if len(par_inds) == 2:
         y_mod = line_model(par, x)
         line_lnlike = sum(-.5*((y_mod - y)/yerr)**2)
-    else:
+    elif len(par_inds) == 3:
         y_mod = gauss_model(par, x)
         gauss_lnlike = sum(-.5*((y_mod - y)/yerr)**2)
-    return line_lnlike + gauss_lnlike
+    elif len(par_inds) == 5:
+        y_mod = line_model(par, x)
+        line_lnlike = sum(-.5*((y_mod - y)/yerr)**2)
+        y_mod = gauss_model(par, x)
+        gauss_lnlike = sum(-.5*((y_mod - y)/yerr)**2)
+    return line_lnlike + gauss_lnlike + lnprior(par)
+
+
+def lnprior(par):
+    m = (0 < par) * (par < 15)
+    if sum(m) == len(m):
+        return 0.
+    else:
+        return -np.inf
 
 
 def test_metropolis_hastings():
@@ -53,7 +66,7 @@ def test_metropolis_hastings():
     t = np.array([.01, .01, .01, .01, .01])
     par_ind_list = [np.array([0, 1, 2, 3, 4]), np.array([0, 1]),
                     np.array([2, 3, 4])]
-    par_ind_list = [np.array([0, 1, 2, 3, 4])]
+    # par_ind_list = [np.array([0, 1, 2, 3, 4])]
 
     args = np.array([x, y, yerr, par_ind_list[0]])
     samples, lnprobs = gc.gibbs_control(par, lnlike, nsteps, niter, t,

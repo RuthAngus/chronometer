@@ -136,7 +136,7 @@ def MH(par, lnprob, nsteps, t, *args):
 
 def MH_step(par, lnprob, t, *args):
     newp = par + np.random.randn(len(par))*(t *
-                                            np.exp(np.random.uniform(-7, 3)))
+                                            np.exp(np.random.uniform(-7, 2)))
     new_lnprob = lnprob(newp, *args)
     alpha = np.exp(new_lnprob - lnprob(par, *args))
     if alpha > 1:
@@ -189,10 +189,12 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
     probs = []
     for i in range(niter):  # Loop over Gibbs repeats.
         print("Gibbs iteration ", i, "of ", niter)
+        print(par)
         for k in range(len(par_inds_list)):  # loop over parameter sets.
             print("Parameter set ", k, "of", len(par_inds_list))
 
             args[-1] = par_inds_list[k]
+            print(par)
             samples, par, pb = MH(par, lnprob, nsteps, t, *args)
             if len(par_inds_list[k]) == len(par):  # If sampling all params:
                 all_samples[nsteps*i*2:nsteps*((i*2)+1),
