@@ -102,12 +102,13 @@ def lnprob(params, *args):
     mod: (list)
         list of pre-computed star model objects.
     """
-    # print(lnlike(params, *args), lnprior(params), "lnlike, lnprior")
     return lnlike(params, *args) + lnprior(params)
 
 
 def MH(par, lnprob, nsteps, t, *args):
     """
+    This is where the full list of parameters is reduced to just those being
+    sampled.
     params:
     -------
     par: (list)
@@ -129,13 +130,13 @@ def MH(par, lnprob, nsteps, t, *args):
         accept += acc
         probs.append(new_prob)
         samples[i, :] = par[par_inds]
-    print(accept, nsteps)
     print("Acceptance fraction = ", accept/float(nsteps))
     return samples, par, probs
 
 
 def MH_step(par, lnprob, t, *args):
-    newp = par + np.random.randn(len(par))*t
+    newp = par + np.random.randn(len(par))*(t *
+                                            np.exp(np.random.uniform(-7, 3)))
     new_lnprob = lnprob(newp, *args)
     alpha = np.exp(new_lnprob - lnprob(par, *args))
     if alpha > 1:
@@ -151,23 +152,22 @@ def MH_step(par, lnprob, t, *args):
     return par, new_lnprob, accept
 
 
-def gibbs_control(par, mods, d, nsteps, niter, t):
+def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
     """
     This function tells the metropolis hastings what parameters to sample in.
     params:
     ------
     par: (list)
         The parameters.
-    mods: (list)
-        The list of starmodel objects.
-    d: (pandas.dataframe)
-        The data.
     nsteps: (int)
         Number of samples.
     niter: (int)
         The number of gibbs cycles to perform.
     t: (float)
         The std of the proposal distribution.
+    args: (list)
+        A list of the args to parse to lnlike.
+        mods, period, period_errs, bv, bv_errs, par_inds = args
     returns:
     -------
     samples: (np.array)
@@ -176,63 +176,34 @@ def gibbs_control(par, mods, d, nsteps, niter, t):
         Array of lnprobs
     """
 
-    N, ndim = len(d.age.values), len(par)
-    n_parameter_sets = N + 1 + 1  # Number of param sets, including all.
+    ndim = len(par)
+    n_parameter_sets = len(par_inds_list)
 
     # Final sample array
-    all_samples = np.zeros((nsteps * n_parameter_sets * niter, ndim))
+    skip = 2
+    if len(par_inds_list[0]) == 1:
+        skip = 1
+    all_samples = np.zeros((nsteps * skip * niter, ndim))
 
-    # Construct parameter indices for the different parameter sets.
-    par_inds = np.arange(ndim)  # All
-    gyro_par_inds = np.concatenate((par_inds[:3], par_inds[3+N:3+2*N])) # Gyro
-    iso_par_inds = []
-    for i in range(N):
-        iso_par_inds.append(par_inds[3+i::N])  # Iso stars.
-
-    args = [mods, d.period.values, d.period_err.values, d.bv.values,
-            d.bv_err.values,
-            par_inds]
+    assert len(par_inds_list[0]) == len(par), "You should sample all the " \
+        "parameters first!"
 
     # Iterate over niter cycles of parameter sets.
-    _set, probs = 0, []
-    for i in range(niter):
-        print("all")
-        print(par)
-        print("First likelihood evaluation...")
-        # First sample all the parameters.
-        args[-1] = par_inds
-        samples, par, pb = MH(par, lnprob, nsteps, t, *args)
-        all_samples[nsteps*_set:nsteps*(_set+1), par_inds] = samples
-        probs.append(pb)
+    probs = []
+    for i in range(niter):  # Loop over Gibbs repeats.
+        print("Gibbs iteration ", i, "of ", niter)
+        for k in range(len(par_inds_list)):  # loop over parameter sets.
+            print("Parameter set ", k, "of", len(par_inds_list))
 
-        # Then sample the gyro parameters only.
-        print("gyro")
-        print(par)
-        input("e")
-        _set += 1
-        args[-1] = gyro_par_inds
-        gyro_samples, par, pb = MH(par, lnprob, nsteps, t, *args)
-        all_samples[nsteps*_set:(_set+1)*nsteps, gyro_par_inds] = \
-            gyro_samples
-        probs.append(pb)
-
-        # Replace parameter array with the last sample from gyro.
-        # par[gyro_par_inds] = last_gyro_sample
-
-        # Then sample the stars, one by one.
-        single_last_samps = []
-        _set += 1
-        for i in range(N):
-            print("iso", i)
-            print(par)
-            input("e")
-            args[-1] = iso_par_inds[i]
-            samps, par, pb = MH(par, lnprob, nsteps, t, *args)
-            all_samples[_set*nsteps:(_set+1)*nsteps, iso_par_inds[i]] = \
-                samps
+            args[-1] = par_inds_list[k]
+            samples, par, pb = MH(par, lnprob, nsteps, t, *args)
+            if len(par_inds_list[k]) == len(par):  # If sampling all params:
+                all_samples[nsteps*i*skip:nsteps*((i*skip)+1),
+                            par_inds_list[k]] = samples
+            else:  # if sampling (non-overlapping) parameter subsets:
+                all_samples[nsteps*((i*2)+1):nsteps*((i*2)+2),
+                            par_inds_list[k]] = samples
             probs.append(pb)
-            _set += 1
-            # par[iso_par_inds[i]] = last_samp
 
     lnprobs = np.array([i for j in probs for i in j])
     return all_samples, lnprobs
@@ -248,11 +219,22 @@ if __name__ == "__main__":
 
     start = time.time()  # timeit
 
-    t = .5*np.array([.01, .01, .01, .03, .1, .1, .3, .3, .3, .1, .2, .2, .02,
+    t = .1*np.array([.01, .01, .01, .03, .1, .1, .3, .3, .3, .1, .2, .2, .02,
                      .2, .2, .01, .2, .2])
     t = np.ones(len(t))*1e-3
     nsteps, niter = 1000, 3
-    flat, lnprobs = gibbs_control(params, mods, d, nsteps, niter, t)
+
+
+    # Construct parameter indices for the different parameter sets.
+    par_inds = np.arange(ndim)  # All
+    gyro_par_inds = np.concatenate((par_inds[:3], par_inds[3+N:3+2*N])) # Gyro
+    par_inds_list = [par_inds, gyro_par_inds]
+    for i in range(N):
+        par_inds_list.append(par_inds[3+i::N])  # Iso stars.
+    args = [mods, d.period.values, d.period_err.values, d.bv.values,
+            d.bv_err.values, par_inds_list[0]]
+    flat, lnprobs = gibbs_control(params, nsteps, niter, t, par_inds_list,
+                                  *args)
 
     end = time.time()
     print("Time taken = ", (end - start)/60, "minutes")
