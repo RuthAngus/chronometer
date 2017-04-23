@@ -75,7 +75,9 @@ def lnlike(params, *args):
 
 def emcee_lnprob(params, *args):
     mods, period, period_errs, bv, bv_errs, _ = args
-    gyro_lnlike =  sum(-.5*((period - gyro_model(params, bv))/period_errs)**2)
+    g_par_inds = np.concatenate((par_inds[:3], par_inds[3+N:3+2*N]))
+    gyro_lnlike =  sum(-.5*((period - gyro_model(params[g_par_inds], bv))
+                            /period_errs)**2)
     p = params*1
     p[3:3+N] = np.exp(p[3:3+N])
     p[3+N:3+2*N] = np.log10(1e9*np.exp(p[3+N:3+2*N]))
@@ -243,16 +245,18 @@ if __name__ == "__main__":
     for i in range(N):
         par_inds_list.append(par_inds[3+i::N])  # Iso stars.
 
-    args = [mods, d.period.values, d.period_err.values, d.bv.values,
-            d.bv_err.values, par_inds_list]
+    # args = [mods, d.period.values, d.period_err.values, d.bv.values,
+            # d.bv_err.values, par_inds_list]
     # flat, lnprobs = gibbs_control(params, lnprob, nsteps, niter, t,
     #                               par_inds_list, args)
 
-    nwalkers, nsteps, ndim = 64, 10000, len(params)
+    emcee_args = [mods, d.period.values, d.period_err.values, d.bv.values,
+                  d.bv_err.values, par_inds_list[0]]
+    nwalkers, nsteps, ndim = 64, 1000, len(params)
     p0 = [1e-4*np.random.rand(ndim) + params for i in range(nwalkers)]
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, emcee_lnprob, args=args)
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=args)
     print("burning in...")
-    pos, _, _ = sampler.run_mcmc(p0, 1000)
+    pos, _, _ = sampler.run_mcmc(p0, 100)
     sampler.reset()
     print("production run...")
     sampler.run_mcmc(pos, nsteps)
