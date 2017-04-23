@@ -232,9 +232,9 @@ if __name__ == "__main__":
 
     start = time.time()  # timeit
 
-    t = .1*np.array([.01, .01, .01, .03, .1, .1, .3, .3, .3, .1, .2, .2, .02,
-                     .2, .2, .01, .2, .2])
-    # t = np.ones(len(t))*1e-3
+    t = np.array([.01, .01, .01, .03, .1, .1, .3, .3, .3, .1, .2, .2, .02, .2,
+                  .2, .01, .2, .2])
+    t = np.ones(len(t))*1e-2
     nsteps, niter = 10000, 20
 
     # Construct parameter indices for the different parameter sets.
@@ -245,22 +245,22 @@ if __name__ == "__main__":
     for i in range(N):
         par_inds_list.append(par_inds[3+i::N])  # Iso stars.
 
-    # args = [mods, d.period.values, d.period_err.values, d.bv.values,
-            # d.bv_err.values, par_inds_list]
-    # flat, lnprobs = gibbs_control(params, lnprob, nsteps, niter, t,
-    #                               par_inds_list, args)
+    args = [mods, d.period.values, d.period_err.values, d.bv.values,
+            d.bv_err.values, par_inds_list]
+    flat, lnprobs = gibbs_control(params, lnprob, nsteps, niter, t,
+                                  par_inds_list, args)
 
-    emcee_args = [mods, d.period.values, d.period_err.values, d.bv.values,
-                  d.bv_err.values, par_inds_list[0]]
-    nwalkers, nsteps, ndim = 64, 1000, len(params)
-    p0 = [1e-4*np.random.rand(ndim) + params for i in range(nwalkers)]
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=args)
-    print("burning in...")
-    pos, _, _ = sampler.run_mcmc(p0, 100)
-    sampler.reset()
-    print("production run...")
-    sampler.run_mcmc(pos, nsteps)
-    flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
+    # emcee_args = [mods, d.period.values, d.period_err.values, d.bv.values,
+    #               d.bv_err.values, par_inds_list[0]]
+    # nwalkers, nsteps, ndim = 64, 1000, len(params)
+    # p0 = [1e-4*np.random.rand(ndim) + params for i in range(nwalkers)]
+    # sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=emcee_args)
+    # print("burning in...")
+    # pos, _, _ = sampler.run_mcmc(p0, 100)
+    # sampler.reset()
+    # print("production run...")
+    # sampler.run_mcmc(pos, nsteps)
+    # flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
 
     # Throw away _number_ Gibbs iterations as burn in.
     number = 5
@@ -272,8 +272,8 @@ if __name__ == "__main__":
 
     print("Plotting results and traces")
     plt.clf()
-    # plt.plot(lnprobs)
-    plt.plot(sampler.lnprobability.T)
+    plt.plot(lnprobs)
+    # plt.plot(sampler.lnprobability.T)
     plt.xlabel("Time")
     plt.ylabel("ln (probability)")
     plt.savefig("prob_trace")
@@ -291,7 +291,9 @@ if __name__ == "__main__":
     fig.savefig("corner_gibbs_for_realz")
 
     # Plot chains
+    ndim = len(params)
     for i in range(ndim):
         plt.clf()
-        plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
+        plt.plot(flat[:, i].T, alpha=.5)
+        # plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
         plt.savefig("{}_trace".format(i))
