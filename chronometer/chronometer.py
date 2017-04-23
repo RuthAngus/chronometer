@@ -232,9 +232,16 @@ if __name__ == "__main__":
 
     start = time.time()  # timeit
 
-    t = np.array([.01, .01, .01, .03, .1, .1, .3, .3, .3, .1, .2, .2, .02, .2,
-                  .2, .01, .2, .2])
-    t = np.ones(len(t))*1e-2
+    gyro_t = np.array([.01, .01, .01])
+    mass_t = np.array([1e-3, 1e-3, 1e-3])
+    age_t = np.array(1e-3, 1e-3, 1e-3])
+    feh_t = np.array(.01, .01, .01])
+    d_t = np.array(1e-3, 1e-3, 1e-3])
+    av_t = np.array(1e-3, 1e-3, 1e-3])
+    # t = np.array([.01, .01, .01, .03, .1, .1, .3, .3, .3, .1, .2, .2, .02, .2,
+    #               .2, .01, .2, .2])
+    # t = np.ones(len(t))*1e-2
+    t = np.concatenate((gyro_t, mass_t, age_t, feh_t, d_t, av_t))
     nsteps, niter = 10000, 20
 
     # Construct parameter indices for the different parameter sets.
