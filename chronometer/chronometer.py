@@ -166,7 +166,8 @@ def MH_step(par, lnprob, t, *args):
     return par, new_lnprob, accept
 
 
-def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
+def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args,
+                  plot=False):
     """
     This function tells the metropolis hastings what parameters to sample in.
     params:
@@ -219,6 +220,9 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
             probs.append(pb)
 
     lnprobs = np.array([i for j in probs for i in j])
+    if plot:
+        fig = corner.corner(flat, truths=truths, labels=labels)
+        fig.savefig("corner_incremental")
     return all_samples, lnprobs
 
 
@@ -234,10 +238,10 @@ if __name__ == "__main__":
 
     gyro_t = np.array([.01, .01, .01])
     mass_t = np.array([1e-3, 1e-3, 1e-3])
-    age_t = np.array(1e-3, 1e-3, 1e-3])
-    feh_t = np.array(.01, .01, .01])
-    d_t = np.array(1e-3, 1e-3, 1e-3])
-    av_t = np.array(1e-3, 1e-3, 1e-3])
+    age_t = np.array([1e-3, 1e-3, 1e-3])
+    feh_t = np.array([.01, .01, .01])
+    d_t = np.array([1e-3, 1e-3, 1e-3])
+    av_t = np.array([1e-3, 1e-3, 1e-3])
     # t = np.array([.01, .01, .01, .03, .1, .1, .3, .3, .3, .1, .2, .2, .02, .2,
     #               .2, .01, .2, .2])
     # t = np.ones(len(t))*1e-2
@@ -255,7 +259,7 @@ if __name__ == "__main__":
     args = [mods, d.period.values, d.period_err.values, d.bv.values,
             d.bv_err.values, par_inds_list]
     flat, lnprobs = gibbs_control(params, lnprob, nsteps, niter, t,
-                                  par_inds_list, args)
+                                  par_inds_list, args, plot=True)
 
     # emcee_args = [mods, d.period.values, d.period_err.values, d.bv.values,
     #               d.bv_err.values, par_inds_list[0]]
