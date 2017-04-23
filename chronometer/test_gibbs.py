@@ -38,13 +38,13 @@ def lnlike(par, x, y, yerr, par_inds):
 
 
 def emcee_lnlike(par, x, y, yerr):
-    # line_lnlike = sum(-.5*((line_model(par[:2], x) - y)/yerr)**2)
-    # gauss_lnlike = sum(-.5*((gauss_model(par[2:], x) - y)/yerr)**2)
+    line_lnlike = sum(-.5*((line_model(par[:2], x) - y)/yerr)**2)
+    gauss_lnlike = sum(-.5*((gauss_model(par[2:], x) - y)/yerr)**2)
     # line_lnlike, gauss_lnlike = 0, sum(-.5*((gauss_model(par, x) - y)/yerr)**2)
     # line_lnlike, gauss_lnlike = sum(-.5*((line_model(par, x) - y)/yerr)**2), 0
-    # return line_lnlike + gauss_lnlike + lnprior(par)
-    return = sum(-.5*((line_model(par[:2], x) + gauss_model(par[2:], x) -
-                   y)/yerr)**2) + lnprior(par)
+    return line_lnlike + gauss_lnlike + lnprior(par)
+    # return = sum(-.5*((line_model(par[:2], x) + gauss_model(par[2:], x) -
+                   # y)/yerr)**2) + lnprior(par)
 
 
 def lnprior(par):
