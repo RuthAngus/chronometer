@@ -10,11 +10,13 @@ import emcee
 
 
 def line_model(par, x):
-    return par[0] + par[1]*x
+    c, m = np.exp(par)
+    return m*x + c
 
 
 def gauss_model(par, x):
-    return par[2]*np.exp(-.5*((par[0] - x)/par[1])**2)
+    mu, sigma, A = np.exp(par)
+    return A*np.exp(-.5*((mu - x)/sigma)**2)
 
 
 def lnlike(par, x, y, yerr, par_inds):
@@ -30,15 +32,13 @@ def lnlike(par, x, y, yerr, par_inds):
         y_mod = gauss_model(par, x)
         gauss_lnlike = sum(-.5*((y_mod - y)/yerr)**2)
     elif len(par_inds) == 5:
-        y_mod = line_model(par, x)
-        line_lnlike = sum(-.5*((y_mod - y)/yerr)**2)
-        y_mod = gauss_model(par, x)
-        gauss_lnlike = sum(-.5*((y_mod - y)/yerr)**2)
+        line_lnlike = sum(-.5*((line_model(par[:2], x) - y)/yerr)**2)
+        gauss_lnlike = sum(-.5*((gauss_model(par[2:], x) - y)/yerr)**2)
     return line_lnlike + gauss_lnlike + lnprior(par)
 
 
 def lnprior(par):
-    m = (0 < par) * (par < 15)
+    m = (-10 < par) * (par < 10)
     if sum(m) == len(m):
         return 0.
     else:
@@ -47,7 +47,8 @@ def lnprior(par):
 
 def test_metropolis_hastings():
 
-    par = np.array([.7, 2.5, 2, .5, 10])
+    # c, m, mu, sigma, A
+    par = np.log(np.array([.7, 2.5, 2, .5, 10]))
 
     # Straight line model
     x = np.arange(0, 10, .1)
@@ -92,7 +93,7 @@ def test_metropolis_hastings():
     plt.plot(x, line_model(results[:2], x) + gauss_model(results[2:], x))
     plt.savefig("test")
 
-    fig = corner.corner(samples, truths=par, labels=["m", "c", "mu", "std",
+    fig = corner.corner(samples, truths=par, labels=["c", "m", "mu", "std",
                                                      "A"])
     fig.savefig("corner_MH_test")
 
