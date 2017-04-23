@@ -15,8 +15,8 @@ from isochrones.mist import MIST_Isochrone
 import corner
 import priors
 from models import gc_model, gyro_model
+import emcee
 
-import teff_bv as tbv
 from utils import replace_nans_with_inits, vk2teff, make_param_dict, \
     parameter_assignment, pars_and_mods, transform_parameters
 
@@ -71,6 +71,18 @@ def lnlike(params, *args):
         p[3] = np.exp(p[3])
         iso_lnlike = ms.lnlike(p)
     return gyro_lnlike + iso_lnlike
+
+
+def emcee_lnprob(params, *args):
+    mods, period, period_errs, bv, bv_errs, _ = args
+    gyro_lnlike =  sum(-.5*((period - gyro_model(params, bv))/period_errs)**2)
+    p = params*1
+    p[3:3+N] = np.exp(p[3:3+N])
+    p[3+N:3+2*N] = np.log10(1e9*np.exp(p[3+N:3+2*N]))
+    p[3+3*N:3+4*N] = np.exp(p[3+3*N:3+4*N])
+    iso_lnlike = sum([mods[i].lnlike(p[3+i::N]) for i in
+                        range(len(mods))])
+    return gyro_lnlike + iso_lnlike + lnprior(params)
 
 
 def lnprior(params):
@@ -220,32 +232,62 @@ if __name__ == "__main__":
 
     t = .1*np.array([.01, .01, .01, .03, .1, .1, .3, .3, .3, .1, .2, .2, .02,
                      .2, .2, .01, .2, .2])
-    t = np.ones(len(t))*1e-3
-    nsteps, niter = 1000, 3
-
+    # t = np.ones(len(t))*1e-3
+    nsteps, niter = 10000, 20
 
     # Construct parameter indices for the different parameter sets.
-    par_inds = np.arange(ndim)  # All
+    par_inds = np.arange(len(params))  # All
+    N = len(mods)
     gyro_par_inds = np.concatenate((par_inds[:3], par_inds[3+N:3+2*N])) # Gyro
     par_inds_list = [par_inds, gyro_par_inds]
     for i in range(N):
         par_inds_list.append(par_inds[3+i::N])  # Iso stars.
+
     args = [mods, d.period.values, d.period_err.values, d.bv.values,
-            d.bv_err.values, par_inds_list[0]]
-    flat, lnprobs = gibbs_control(params, nsteps, niter, t, par_inds_list,
-                                  *args)
+            d.bv_err.values, par_inds_list]
+    # flat, lnprobs = gibbs_control(params, lnprob, nsteps, niter, t,
+    #                               par_inds_list, args)
+
+    nwalkers, nsteps, ndim = 64, 10000, len(params)
+    p0 = [1e-4*np.random.rand(ndim) + params for i in range(nwalkers)]
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, emcee_lnprob, args=args)
+    print("burning in...")
+    pos, _, _ = sampler.run_mcmc(p0, 1000)
+    sampler.reset()
+    print("production run...")
+    sampler.run_mcmc(pos, nsteps)
+    flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
+
+    # Throw away _number_ Gibbs iterations as burn in.
+    number = 5
+    burnin = nsteps * number * 2
+    flat = flat[burnin:, :]
 
     end = time.time()
     print("Time taken = ", (end - start)/60, "minutes")
 
     print("Plotting results and traces")
     plt.clf()
-    plt.plot(lnprobs)
+    # plt.plot(lnprobs)
+    plt.plot(sampler.lnprobability.T)
     plt.xlabel("Time")
     plt.ylabel("ln (probability)")
     plt.savefig("prob_trace")
 
     print("Making corner plot")
-    ndim = len(params)
-    fig = corner.corner(flat)
+    truths = [.7725, .601, .5189, np.log(1), None, None, np.log(4.56),
+            np.log(2.5), np.log(2.5), 0., None, None, np.log(10),
+            np.log(2400), np.log(2400), 0., None, None]
+    labels = ["$a$", "$b$", "$n$", "$\ln(Mass_1)$", "$\ln(Mass_2)$",
+                "$\ln(Mass_3)$", "$\ln(Age_1)$", "$\ln(Age_2)$",
+                "$\ln(Age_3)$", "$[Fe/H]_1$", "$[Fe/H]_2$", "$[Fe/H]_3$",
+                "$\ln(D_1)$", "$\ln(D_2)$", "$\ln(D_3)$", "$A_{v1}$",
+                "$A_{v2}$", "$A_{v3}$"]
+    fig = corner.corner(flat, truths=truths, labels=labels)
     fig.savefig("corner_gibbs_for_realz")
+
+    # Plot chains
+    for i in range(ndim):
+        plt.clf()
+        plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
+        plt.savefig("{}_trace".format(i))
