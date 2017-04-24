@@ -219,6 +219,7 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args,
                 print(k, "th set", nsteps*((i*2)+1), nsteps*((i*2)+2))
                 all_samples[nsteps*((i*2)+1):nsteps*((i*2)+2),
                             par_inds_list[k]] = samples
+                # all_samples[nsteps*i:nsteps*(i+1), par_inds_list[k]] = samples
             probs.append(pb)
         # if plot:
             # truths = [.7725, .601, .5189, np.log(1), None, None,
@@ -238,8 +239,6 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args,
 
 
     lnprobs = np.array([i for j in probs for i in j])
-    print(all_samples[200:300, :])
-    input("enter")
     return all_samples, lnprobs
 
 
@@ -259,17 +258,18 @@ if __name__ == "__main__":
     feh_t = np.array([.01, .01, .01])
     d_t = np.array([1e-2, 1e-2, 1e-2])
     av_t = np.array([1e-2, 1e-2, 1e-2])
+    t = np.concatenate((gyro_t, mass_t, age_t, feh_t, d_t, av_t))
     # t = np.array([.01, .01, .01, .03, .1, .1, .3, .3, .3, .1, .2, .2, .02, .2,
     #               .2, .01, .2, .2])
-    # t = np.ones(len(t))*1e-2
-    t = np.concatenate((gyro_t, mass_t, age_t, feh_t, d_t, av_t))
-    nsteps, niter = 100, 2
+    # t = np.ones(len(params))
+    nsteps, niter = 100000, 10
 
     # Construct parameter indices for the different parameter sets.
     par_inds = np.arange(len(params))  # All
     N = len(mods)
     gyro_par_inds = np.concatenate((par_inds[:3], par_inds[3+N:3+2*N])) # Gyro
     par_inds_list = [par_inds, gyro_par_inds]
+    # par_inds_list = [gyro_par_inds]
     for i in range(N):
         par_inds_list.append(par_inds[3+i::N])  # Iso stars.
 
