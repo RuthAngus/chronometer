@@ -212,17 +212,34 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args,
             print(par)
             samples, par, pb = MH(par, lnprob, nsteps, t, *args)
             if len(par_inds_list[k]) == len(par):  # If sampling all params:
+                print("all", nsteps*i*2, nsteps*((i*2)+1))
                 all_samples[nsteps*i*2:nsteps*((i*2)+1),
                             par_inds_list[k]] = samples
             else:  # if sampling (non-overlapping) parameter subsets:
+                print(k, "th set", nsteps*((i*2)+1), nsteps*((i*2)+2))
                 all_samples[nsteps*((i*2)+1):nsteps*((i*2)+2),
                             par_inds_list[k]] = samples
             probs.append(pb)
+        # if plot:
+            # truths = [.7725, .601, .5189, np.log(1), None, None,
+            #             np.log(4.56), np.log(2.5), np.log(2.5), 0.,
+            #             None, None, np.log(10), np.log(2400),
+            #             np.log(2400), 0., None, None]
+            # labels = ["$a$", "$b$", "$n$", "$\ln(Mass_1)$",
+            #             "$\ln(Mass_2)$", "$\ln(Mass_3)$",
+            #             "$\ln(Age_1)$", "$\ln(Age_2)$",
+            #             "$\ln(Age_3)$", "$[Fe/H]_1$", "$[Fe/H]_2$",
+            #             "$[Fe/H]_3$", "$\ln(D_1)$", "$\ln(D_2)$",
+            #             "$\ln(D_3)$", "$A_{v1}$", "$A_{v2}$",
+            #             "$A_{v3}$"]
+            # fig = corner.corner(all_samples[:nsteps*((i*2)+2), :],
+            #                     truths=truths, labels=labels)
+            # fig.savefig("corner_incremental")
+
 
     lnprobs = np.array([i for j in probs for i in j])
-    if plot:
-        fig = corner.corner(flat, truths=truths, labels=labels)
-        fig.savefig("corner_incremental")
+    print(all_samples[200:300, :])
+    input("enter")
     return all_samples, lnprobs
 
 
@@ -237,16 +254,16 @@ if __name__ == "__main__":
     start = time.time()  # timeit
 
     gyro_t = np.array([.01, .01, .01])
-    mass_t = np.array([1e-3, 1e-3, 1e-3])
-    age_t = np.array([1e-3, 1e-3, 1e-3])
+    mass_t = np.array([1e-2, 1e-2, 1e-2])
+    age_t = np.array([1e-2, 1e-2, 1e-2])
     feh_t = np.array([.01, .01, .01])
-    d_t = np.array([1e-3, 1e-3, 1e-3])
-    av_t = np.array([1e-3, 1e-3, 1e-3])
+    d_t = np.array([1e-2, 1e-2, 1e-2])
+    av_t = np.array([1e-2, 1e-2, 1e-2])
     # t = np.array([.01, .01, .01, .03, .1, .1, .3, .3, .3, .1, .2, .2, .02, .2,
     #               .2, .01, .2, .2])
     # t = np.ones(len(t))*1e-2
     t = np.concatenate((gyro_t, mass_t, age_t, feh_t, d_t, av_t))
-    nsteps, niter = 10000, 20
+    nsteps, niter = 100, 2
 
     # Construct parameter indices for the different parameter sets.
     par_inds = np.arange(len(params))  # All
@@ -274,9 +291,9 @@ if __name__ == "__main__":
     # flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
 
     # Throw away _number_ Gibbs iterations as burn in.
-    number = 5
-    burnin = nsteps * number * 2
-    flat = flat[burnin:, :]
+    # number = 5
+    # burnin = nsteps * number * 2
+    # flat = flat[burnin:, :]
 
     end = time.time()
     print("Time taken = ", (end - start)/60, "minutes")
