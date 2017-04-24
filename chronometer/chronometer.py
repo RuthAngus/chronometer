@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from isochrones import StarModel
 from isochrones.mist import MIST_Isochrone
+import h5py
 
 import corner
 import priors
@@ -137,10 +138,11 @@ def MH(par, lnprob, nsteps, t, *args):
     """
     par_inds = args[-1]
     samples = np.zeros((nsteps, len(par[par_inds])))
+
     accept, probs = 0, []
     for i in range(nsteps):
         par[par_inds], new_prob, acc = MH_step(par[par_inds], lnprob,
-                                               t[par_inds], *args)
+                                               t, *args)
         accept += acc
         probs.append(new_prob)
         samples[i, :] = par[par_inds]
@@ -149,8 +151,10 @@ def MH(par, lnprob, nsteps, t, *args):
 
 
 def MH_step(par, lnprob, t, *args):
-    newp = par + np.random.randn(len(par))*(t *
-                                            np.exp(np.random.uniform(-7, 2)))
+    # newp = par + np.random.randn(len(par))*(t *
+                                            # np.exp(np.random.uniform(-7, 2)))
+    newp = par + np.random.randn(len(par)) * \
+        np.random.multivariate_normal(np.zeros((len(par))), t)
     new_lnprob = lnprob(newp, *args)
     alpha = np.exp(new_lnprob - lnprob(par, *args))
     if alpha > 1:
@@ -166,8 +170,7 @@ def MH_step(par, lnprob, t, *args):
     return par, new_lnprob, accept
 
 
-def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args,
-                  plot=False):
+def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
     """
     This function tells the metropolis hastings what parameters to sample in.
     params:
@@ -206,11 +209,9 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args,
         print("Gibbs iteration ", i, "of ", niter)
         print(par)
         for k in range(len(par_inds_list)):  # loop over parameter sets.
-            print("Parameter set ", k, "of", len(par_inds_list))
-
             args[-1] = par_inds_list[k]
             print(par)
-            samples, par, pb = MH(par, lnprob, nsteps, t, *args)
+            samples, par, pb = MH(par, lnprob, nsteps, t[i], *args)
             if len(par_inds_list[k]) == len(par):  # If sampling all params:
                 print("all", nsteps*i*2, nsteps*((i*2)+1))
                 all_samples[nsteps*i*2:nsteps*((i*2)+1),
@@ -219,27 +220,17 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args,
                 print(k, "th set", nsteps*((i*2)+1), nsteps*((i*2)+2))
                 all_samples[nsteps*((i*2)+1):nsteps*((i*2)+2),
                             par_inds_list[k]] = samples
-                # all_samples[nsteps*i:nsteps*(i+1), par_inds_list[k]] = samples
             probs.append(pb)
-        # if plot:
-            # truths = [.7725, .601, .5189, np.log(1), None, None,
-            #             np.log(4.56), np.log(2.5), np.log(2.5), 0.,
-            #             None, None, np.log(10), np.log(2400),
-            #             np.log(2400), 0., None, None]
-            # labels = ["$a$", "$b$", "$n$", "$\ln(Mass_1)$",
-            #             "$\ln(Mass_2)$", "$\ln(Mass_3)$",
-            #             "$\ln(Age_1)$", "$\ln(Age_2)$",
-            #             "$\ln(Age_3)$", "$[Fe/H]_1$", "$[Fe/H]_2$",
-            #             "$[Fe/H]_3$", "$\ln(D_1)$", "$\ln(D_2)$",
-            #             "$\ln(D_3)$", "$A_{v1}$", "$A_{v2}$",
-            #             "$A_{v3}$"]
-            # fig = corner.corner(all_samples[:nsteps*((i*2)+2), :],
-            #                     truths=truths, labels=labels)
-            # fig.savefig("corner_incremental")
 
 
     lnprobs = np.array([i for j in probs for i in j])
     return all_samples, lnprobs
+
+
+def estimate_covariance():
+    with h5py.File("emcee_posterior_samples.h5", "r") as f:
+        samples = f["samples"][...]
+    return np.cov(samples, rowvar=False)
 
 
 if __name__ == "__main__":
@@ -252,17 +243,20 @@ if __name__ == "__main__":
 
     start = time.time()  # timeit
 
-    gyro_t = np.array([.01, .01, .01])
-    mass_t = np.array([1e-2, 1e-2, 1e-2])
-    age_t = np.array([1e-2, 1e-2, 1e-2])
-    feh_t = np.array([.01, .01, .01])
-    d_t = np.array([1e-2, 1e-2, 1e-2])
-    av_t = np.array([1e-2, 1e-2, 1e-2])
-    t = np.concatenate((gyro_t, mass_t, age_t, feh_t, d_t, av_t))
+    t = estimate_covariance()
+    print(np.shape(t))
+    # gyro_t = np.array([.01, .01, .01])
+    # mass_t = np.array([1e-2, 1e-2, 1e-2])
+    # age_t = np.array([1e-2, 1e-2, 1e-2])
+    # feh_t = np.array([.01, .01, .01])
+    # d_t = np.array([1e-2, 1e-2, 1e-2])
+    # av_t = np.array([1e-2, 1e-2, 1e-2])
+    # t = np.concatenate((gyro_t, mass_t, age_t, feh_t, d_t, av_t))
     # t = np.array([.01, .01, .01, .03, .1, .1, .3, .3, .3, .1, .2, .2, .02, .2,
     #               .2, .01, .2, .2])
     # t = np.ones(len(params))
-    nsteps, niter = 100000, 10
+
+    nsteps, niter = 1000, 10
 
     # Construct parameter indices for the different parameter sets.
     par_inds = np.arange(len(params))  # All
@@ -273,10 +267,21 @@ if __name__ == "__main__":
     for i in range(N):
         par_inds_list.append(par_inds[3+i::N])  # Iso stars.
 
+    # Create the covariance matrices.
+    ts = []
+    for i, par_ind in enumerate(par_inds_list):
+        t_mask = np.ones(len(params), dtype=bool)
+        for pi in par_ind:
+            t_mask[pi] = False
+        t_stack = t_mask
+        for p in range(len(params) - 1):
+            t_stack = np.vstack((t_stack, t_mask))
+        ts.append(np.ma.array(t, mask=t_stack))
+
     args = [mods, d.period.values, d.period_err.values, d.bv.values,
             d.bv_err.values, par_inds_list]
-    flat, lnprobs = gibbs_control(params, lnprob, nsteps, niter, t,
-                                  par_inds_list, args, plot=True)
+    flat, lnprobs = gibbs_control(params, lnprob, nsteps, niter, ts,
+                                  par_inds_list, args)
 
     # emcee_args = [mods, d.period.values, d.period_err.values, d.bv.values,
     #               d.bv_err.values, par_inds_list[0]]
@@ -289,6 +294,11 @@ if __name__ == "__main__":
     # print("production run...")
     # sampler.run_mcmc(pos, nsteps)
     # flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
+
+    # f = h5py.File("emcee_posterior_samples.h5", "w")
+    # data = f.create_dataset("samples", np.shape(flat))
+    # data[:, :] = flat
+    # f.close()
 
     # Throw away _number_ Gibbs iterations as burn in.
     # number = 5
