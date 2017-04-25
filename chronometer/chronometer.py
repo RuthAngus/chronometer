@@ -151,12 +151,7 @@ def MH(par, lnprob, nsteps, t, *args):
 
 
 def MH_step(par, lnprob, t, *args):
-    # newp = par + np.random.randn(len(par))*(t *
-                                            # np.exp(np.random.uniform(-7, 2)))
-    # print(len(np.zeros((len(par)))), len(t))
-    print(t)
-    newp = par + np.random.randn(len(par)) * \
-        np.random.multivariate_normal(np.zeros((len(par))), t)
+    newp = par + np.random.multivariate_normal(np.zeros((len(par))), t)
     new_lnprob = lnprob(newp, *args)
     alpha = np.exp(new_lnprob - lnprob(par, *args))
     if alpha > 1:
@@ -169,6 +164,7 @@ def MH_step(par, lnprob, t, *args):
             accept = 1
         else:
             accept = 0
+            new_lnprob = lnprob(par, *args)
     return par, new_lnprob, accept
 
 
@@ -212,14 +208,11 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
         print(par)
         for k in range(len(par_inds_list)):  # loop over parameter sets.
             args[-1] = par_inds_list[k]
-            print(par)
-            samples, par, pb = MH(par, lnprob, nsteps, t[i], *args)
+            samples, par, pb = MH(par, lnprob, nsteps, t[k], *args)
             if len(par_inds_list[k]) == len(par):  # If sampling all params:
-                print("all", nsteps*i*2, nsteps*((i*2)+1))
                 all_samples[nsteps*i*2:nsteps*((i*2)+1),
                             par_inds_list[k]] = samples
             else:  # if sampling (non-overlapping) parameter subsets:
-                print(k, "th set", nsteps*((i*2)+1), nsteps*((i*2)+2))
                 all_samples[nsteps*((i*2)+1):nsteps*((i*2)+2),
                             par_inds_list[k]] = samples
             probs.append(pb)
@@ -245,52 +238,24 @@ if __name__ == "__main__":
 
     start = time.time()  # timeit
 
-    t = estimate_covariance()
-    print(np.shape(t))
-    # gyro_t = np.array([.01, .01, .01])
-    # mass_t = np.array([1e-2, 1e-2, 1e-2])
-    # age_t = np.array([1e-2, 1e-2, 1e-2])
-    # feh_t = np.array([.01, .01, .01])
-    # d_t = np.array([1e-2, 1e-2, 1e-2])
-    # av_t = np.array([1e-2, 1e-2, 1e-2])
-    # t = np.concatenate((gyro_t, mass_t, age_t, feh_t, d_t, av_t))
-    # t = np.array([.01, .01, .01, .03, .1, .1, .3, .3, .3, .1, .2, .2, .02, .2,
-    #               .2, .01, .2, .2])
-    # t = np.ones(len(params))
-
-    nsteps, niter = 1000, 10
+    nsteps, niter = 10000, 10
 
     # Construct parameter indices for the different parameter sets.
     par_inds = np.arange(len(params))  # All
     N = len(mods)
     gyro_par_inds = np.concatenate((par_inds[:3], par_inds[3+N:3+2*N])) # Gyro
     par_inds_list = [par_inds, gyro_par_inds]
-    # par_inds_list = [gyro_par_inds]
     for i in range(N):
         par_inds_list.append(par_inds[3+i::N])  # Iso stars.
 
     # Create the covariance matrices.
-    ts = []
-    for i, par_ind in enumerate(par_inds_list):
-        t_mask = np.ones(len(params), dtype=bool)
-        for pi in par_ind:
-            t_mask[pi] = False
-        t_stack = t_mask
-        for p in range(len(params) - 1):
-            t_stack = np.vstack((t_stack, t_mask))
-        ts.append(np.ma.array(t, mask=t_stack))
-
+    t = 1e-3*estimate_covariance()
     ts = []
     for i, par_ind in enumerate(par_inds_list):
         ti = np.zeros((len(par_ind), len(par_ind)))
         for j, ind in enumerate(par_ind):
             ti[j] = t[ind][par_ind]
         ts.append(ti)
-
-    print(par_inds_list[1])
-    print(ts[0][0])
-    print(ts[1][0])
-    assert 0
 
     args = [mods, d.period.values, d.period_err.values, d.bv.values,
             d.bv_err.values, par_inds_list]
