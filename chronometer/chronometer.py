@@ -153,6 +153,8 @@ def MH(par, lnprob, nsteps, t, *args):
 def MH_step(par, lnprob, t, *args):
     # newp = par + np.random.randn(len(par))*(t *
                                             # np.exp(np.random.uniform(-7, 2)))
+    # print(len(np.zeros((len(par)))), len(t))
+    print(t)
     newp = par + np.random.randn(len(par)) * \
         np.random.multivariate_normal(np.zeros((len(par))), t)
     new_lnprob = lnprob(newp, *args)
@@ -277,6 +279,18 @@ if __name__ == "__main__":
         for p in range(len(params) - 1):
             t_stack = np.vstack((t_stack, t_mask))
         ts.append(np.ma.array(t, mask=t_stack))
+
+    ts = []
+    for i, par_ind in enumerate(par_inds_list):
+        ti = np.zeros((len(par_ind), len(par_ind)))
+        for j, ind in enumerate(par_ind):
+            ti[j] = t[ind][par_ind]
+        ts.append(ti)
+
+    print(par_inds_list[1])
+    print(ts[0][0])
+    print(ts[1][0])
+    assert 0
 
     args = [mods, d.period.values, d.period_err.values, d.bv.values,
             d.bv_err.values, par_inds_list]
