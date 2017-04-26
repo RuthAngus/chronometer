@@ -3,6 +3,7 @@ Test MH sampling on one star.
 """
 
 import os
+import sys
 
 import time
 import numpy as np
@@ -73,7 +74,7 @@ def lnprob(params, mod):
     return lnlike(params, mod) + lnprior(params)
 
 
-def MH(par, lnprob, nsteps, t, mod):
+def MH(par, lnprob, nsteps, t, mod, emc=False):
     """
     This is where the full list of parameters is reduced to just those being
     sampled.
@@ -91,19 +92,35 @@ def MH(par, lnprob, nsteps, t, mod):
     """
     samples = np.zeros((nsteps, len(par)))
 
-    accept, probs = 0, []
-    for i in range(nsteps):
-        par, new_prob, acc = MH_step(par, lnprob, t, mod)
-        accept += acc
-        probs.append(new_prob)
-        samples[i, :] = par
+    if emc:
+        nwalkers, ndim = 64, len(par)
+        p0 = [1e-4*np.random.rand(ndim) + par for i in range(nwalkers)]
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=[mod])
+        par, _, _ = sampler.run_mcmc(p0, nsteps)
+        samples = np.reshape(sampler.chain, (nwalkers * nsteps, ndim))
+        probs = sampler.lnprobability.T[:, 0]
+        accept = 0
+
+    else:
+        accept, probs = 0, []
+        for i in range(nsteps):
+            par, new_prob, acc = MH_step(par, lnprob, t, mod)
+            accept += acc
+            probs.append(new_prob)
+            samples[i, :] = par
+
     print("Acceptance fraction = ", accept/float(nsteps))
     return samples, par, probs
 
 
-def MH_step(par, lnprob, t, *args):
-    # newp = par + np.random.randn(len(par))*t \
-    #     *np.exp(np.random.uniform(-7, 2))
+def MH_step(par, lnprob, t, *args, emc=True):
+    if emc:
+        nwalkers, ndim = 10, len(par)
+        p0 = [par + np.random.multivariate_normal(np.zeros((len(par))), t)
+              for i in range(nwalkers)]
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=args)
+        sampler.run_mcmc(p0, 10)
+        return sampler.chain[0][-1], sampler.lnprobability.T[-1, 0], 0
     newp = par + np.random.multivariate_normal(np.zeros((len(par))), t)
     new_lnprob = lnprob(newp, *args)
     alpha = np.exp(new_lnprob - lnprob(par, *args))
@@ -130,26 +147,19 @@ if __name__ == "__main__":
     params, mods = pars_and_mods(DATA_DIR)
     params = params[3:]
     params = params[::3]
+    par_inds = np.array([3, 6, 9, 12, 15])
     mods = mods[0]
 
-    nsteps = 100000
+    nsteps = 1000
 
     with h5py.File("emcee_posterior_samples.h5", "r") as f:
         samples = f["samples"][...]
     ts = np.cov(samples, rowvar=False)
-    par_inds = np.array([3, 6, 9, 12, 15])
     t = np.zeros((len(par_inds), len(par_inds)))
     for j, ind in enumerate(par_inds):
         t[j] = ts[ind][par_inds]
 
-    print(t)
     flat, par, lnprobs = MH(params, lnprob, nsteps, t, mods)
-    # t = np.cov(flat, rowvar=False)
-    # print(t)
-    # flat, par, lnprobs = MH(params, lnprob, nsteps, t, mods)
-    # t = np.cov(flat, rowvar=False)
-    # print(t)
-    # flat, par, lnprobs = MH(params, lnprob, nsteps, t, mods)
 
     print("Plotting results and traces")
     plt.clf()
