@@ -150,7 +150,14 @@ def MH(par, lnprob, nsteps, t, *args):
     return samples, par, probs
 
 
-def MH_step(par, lnprob, t, *args):
+def MH_step(par, lnprob, t, *args, emc=True):
+    if emc:
+        nwalkers, ndim = 64, len(par)
+        p0 = [par + np.random.multivariate_normal(np.zeros((len(par))), t)
+              for i in range(nwalkers)]
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=args)
+        sampler.run_mcmc(p0, 10)
+        return sampler.chain[0][-1], sampler.lnprobability.T[-1, 0], 0
     newp = par + np.random.multivariate_normal(np.zeros((len(par))), t)
     new_lnprob = lnprob(newp, *args)
     alpha = np.exp(new_lnprob - lnprob(par, *args))
@@ -238,7 +245,7 @@ if __name__ == "__main__":
 
     start = time.time()  # timeit
 
-    nsteps, niter = 10000, 10
+    nsteps, niter = 1000, 10
 
     # Construct parameter indices for the different parameter sets.
     par_inds = np.arange(len(params))  # All
@@ -249,7 +256,7 @@ if __name__ == "__main__":
         par_inds_list.append(par_inds[3+i::N])  # Iso stars.
 
     # Create the covariance matrices.
-    t = 1e-3*estimate_covariance()
+    t = .1*estimate_covariance()
     ts = []
     for i, par_ind in enumerate(par_inds_list):
         ti = np.zeros((len(par_ind), len(par_ind)))
