@@ -56,6 +56,7 @@ def lnlike(params, *args):
         if len(par_inds) == 3 + N:
             gyro_lnlike = sum(-.5*((period - gyro_model(params, bv))
                                     /period_errs)**2)
+                               /period_errs)**2)
 
     # If not gyro but single stars
     else:
@@ -278,13 +279,13 @@ if __name__ == "__main__":
 
     start = time.time()  # timeit
 
-    nsteps, niter = 10000, 10
+    nsteps, niter = 1000, 5
 
     # Construct parameter indices for the different parameter sets.
     par_inds = np.arange(len(params))  # All
-    N = len(mods)
     gyro_par_inds = np.concatenate((par_inds[:3], par_inds[3+N:3+2*N])) # Gyro
     # par_inds_list = [par_inds, gyro_par_inds]
+    gyro_par_inds = par_inds[:3]
     par_inds_list = [gyro_par_inds]
     for i in range(N):
         par_inds_list.append(par_inds[3+i::N])  # Iso stars.
@@ -306,7 +307,7 @@ if __name__ == "__main__":
         flat, lnprobs = gibbs_control(params, lnprob, nsteps, niter, ts,
                                     par_inds_list, args)
 
-        # Throw away _number_ Gibbs iterations as burn in.
+        # Throw away _number_ Gibbs iterations as burn in. FIXME
         # number = 1
         # burnin = nsteps * number
         # # burnin = nsteps * number * 2
@@ -335,31 +336,23 @@ if __name__ == "__main__":
     print("Time taken = ", (end - start)/60, "minutes")
 
     print("Plotting results and traces")
-    cols = ["b", "g", "m", "r"]
     plt.clf()
     if run_MH:
         for j in range(4*niter - 1):
             x = np.arange(j*nsteps, (j+1)*nsteps)
-            plt.plot(x, lnprobs[j*nsteps: (j+1)*nsteps], cols[j%4])
+            plt.plot(x, lnprobs[j*nsteps: (j+1)*nsteps])
     else:
         plt.plot(sampler.lnprobability.T)
     plt.xlabel("Time")
     plt.ylabel("ln (probability)")
     plt.savefig(os.path.join(RESULTS_DIR, "prob_trace"))
 
-    print("Making corner plot")
-    truths = [.7725, .601, .5189, np.log(1), None, None, np.log(4.56),
-            np.log(2.5), np.log(2.5), 0., None, None, np.log(10),
-            np.log(2400), np.log(2400), 0., None, None]
     labels = ["$a$", "$b$", "$n$", "$\ln(Mass_1)$", "$\ln(Mass_2)$",
                 "$\ln(Mass_3)$", "$\ln(Age_1)$", "$\ln(Age_2)$",
                 "$\ln(Age_3)$", "$[Fe/H]_1$", "$[Fe/H]_2$", "$[Fe/H]_3$",
                 "$\ln(D_1)$", "$\ln(D_2)$", "$\ln(D_3)$", "$A_{v1}$",
                 "$A_{v2}$", "$A_{v3}$"]
-    fig = corner.corner(flat, truths=truths, labels=labels)
-    fig.savefig(os.path.join(RESULTS_DIR, "demo_corner_gibbs"))
 
-    print(np.shape(flat))
     # Plot chains
     ndim = len(params)
     for i in range(ndim):
@@ -367,8 +360,15 @@ if __name__ == "__main__":
         if run_MH:
             for j in range(niter):
                 x = np.arange(j*nsteps, (j+1)*nsteps)
-                plt.plot(x, flat[j*nsteps: (j+1)*nsteps, i].T, cols[j],
-                         alpha=.5)
+                plt.plot(x, flat[j*nsteps: (j+1)*nsteps, i].T)
+                plt.ylabel(labels[i])
         else:
             plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
         plt.savefig(os.path.join(RESULTS_DIR, "{}_trace".format(i)))
+
+    print("Making corner plot")
+    truths = [.7725, .601, .5189, np.log(1), None, None, np.log(4.56),
+            np.log(2.5), np.log(2.5), 0., None, None, np.log(10),
+            np.log(2400), np.log(2400), 0., None, None]
+    fig = corner.corner(flat, truths=truths, labels=labels)
+    fig.savefig(os.path.join(RESULTS_DIR, "demo_corner_gibbs"))
