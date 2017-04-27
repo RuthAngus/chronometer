@@ -34,9 +34,16 @@ def lnlike(params, *args):
     """
     Probability of age and model parameters given rotation period and colour.
     parameters:
+    Parameters to pass to the models are selected using the par_inds list in
+    *args.
+    Whether an "all parameter", "gyro parameter only" or "single star
+    isochrone parameters only" gibbs step is determined according to the what
+    the elements of par_inds look like.
+    This is probably a bad idea.
     ----------
     params: (array)
         The array of log parameters: a, b, n, age.
+    args = mods, periods, period_errs, bvs, bv_errs, par_inds
     par_inds: (array)
         The parameters to vary.
     """
@@ -75,6 +82,10 @@ def lnlike(params, *args):
 
 
 def emcee_lnprob(params, *args):
+    """
+    The lnprob function used for emcee sampling. Does not break parameters
+    into sets.
+    """
     mods, period, period_errs, bv, bv_errs, _ = args
     g_par_inds = np.concatenate((par_inds[:3], par_inds[3+N:3+2*N]))
     gyro_lnlike =  sum(-.5*((period - gyro_model(params[g_par_inds], bv))
@@ -114,8 +125,9 @@ def lnprob(params, *args):
     The joint log-probability of age given gyro and iso parameters.
     params: (array)
         The parameter array.
-    mod: (list)
-        list of pre-computed star model objects.
+    args: (list)
+        args to pass to lnlike, including mods, a list of pre-computed star
+        model objects.
     """
     return lnlike(params, *args) + lnprior(params)
 
@@ -132,9 +144,17 @@ def MH(par, lnprob, nsteps, t, *args):
         Number of samples.
     t: (float)
         The std of the proposal distribution.
-    args:
-    x, y, yerr: (arrays)
-        The data
+    args: (list)
+    A list of args to pass to the lnlike function.
+    mods, periods, period_errs, bvs, bv_errs, par_ind_list = args
+    returns:
+    --------
+    samples: (2d array)
+        The posterior samples for a single gibbs iteration.
+    par: (array)
+        The list of final parameters.
+    probs: (array)
+        The lnprob chain.
     """
     par_inds = args[-1]
     samples = np.zeros((nsteps, len(par[par_inds])))
@@ -150,7 +170,14 @@ def MH(par, lnprob, nsteps, t, *args):
     return samples, par, probs
 
 
-def MH_step(par, lnprob, t, *args, emc=True):
+def MH_step(par, lnprob, t, *args, emc=False):
+    """
+    A single Metropolis Hastings step.
+    if emc = True, the step is an emcee step instead.
+    emcee is run for 10 steps with 64 walkers and the final position is taken
+    as the step.
+    This is ridiculous but it should demonstrate that tuning is the problem.
+    """
     if emc:
         nwalkers, ndim = 64, len(par)
         p0 = [par + np.random.multivariate_normal(np.zeros((len(par))), t)
@@ -182,12 +209,17 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
     ------
     par: (list)
         The parameters.
+    lnprob: (function)
+        The lnprob function.
     nsteps: (int)
         Number of samples.
     niter: (int)
         The number of gibbs cycles to perform.
     t: (float)
-        The std of the proposal distribution.
+        The covariance matrix of the proposal distribution.
+    par_inds_list: (list)
+        A list of lists of parameter indices, determining the parameters that
+        will be varied during the sampling.
     args: (list)
         A list of the args to parse to lnlike.
         mods, period, period_errs, bv, bv_errs, par_inds = args
@@ -205,8 +237,8 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
     # Final sample array
     all_samples = np.zeros((nsteps * 2 * niter, ndim))
 
-    assert len(par_inds_list[0]) == len(par), "You should sample all the " \
-        "parameters first!"
+    # assert len(par_inds_list[0]) == len(par), "You should sample all the " \
+        # "parameters first!"
 
     # Iterate over niter cycles of parameter sets.
     probs = []
@@ -216,12 +248,13 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
         for k in range(len(par_inds_list)):  # loop over parameter sets.
             args[-1] = par_inds_list[k]
             samples, par, pb = MH(par, lnprob, nsteps, t[k], *args)
-            if len(par_inds_list[k]) == len(par):  # If sampling all params:
-                all_samples[nsteps*i*2:nsteps*((i*2)+1),
-                            par_inds_list[k]] = samples
-            else:  # if sampling (non-overlapping) parameter subsets:
-                all_samples[nsteps*((i*2)+1):nsteps*((i*2)+2),
-                            par_inds_list[k]] = samples
+            all_samples[nsteps*i:nsteps*(i+1), par_inds_list[k]] = samples
+            # if len(par_inds_list[k]) == len(par):  # If sampling all params:
+            #     all_samples[nsteps*i*2:nsteps*((i*2)+1),
+            #                 par_inds_list[k]] = samples
+            # else:  # if sampling (non-overlapping) parameter subsets:
+            #     all_samples[nsteps*((i*2)+1):nsteps*((i*2)+2),
+            #                 par_inds_list[k]] = samples
             probs.append(pb)
 
 
@@ -230,6 +263,9 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
 
 
 def estimate_covariance():
+    """
+    Return the covariance matrix of the emcee samples.
+    """
     with h5py.File("emcee_posterior_samples.h5", "r") as f:
         samples = f["samples"][...]
     return np.cov(samples, rowvar=False)
@@ -237,6 +273,12 @@ def estimate_covariance():
 
 if __name__ == "__main__":
 
+    # Use Metropolis hastings or emcee?
+    run_MH = True
+    RESULTS_DIR = "/Users/ruthangus/projects/chronometer/chronometer/MH"
+    # RESULTS_DIR = "/Users/ruthangus/projects/chronometer/chronometer/emc"
+
+    # Load the data for the initial parameter array.
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
     d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
 
@@ -245,13 +287,14 @@ if __name__ == "__main__":
 
     start = time.time()  # timeit
 
-    nsteps, niter = 1000, 10
+    nsteps, niter = 10000, 5
 
     # Construct parameter indices for the different parameter sets.
     par_inds = np.arange(len(params))  # All
     N = len(mods)
     gyro_par_inds = np.concatenate((par_inds[:3], par_inds[3+N:3+2*N])) # Gyro
-    par_inds_list = [par_inds, gyro_par_inds]
+    # par_inds_list = [par_inds, gyro_par_inds]
+    par_inds_list = [gyro_par_inds]
     for i in range(N):
         par_inds_list.append(par_inds[3+i::N])  # Iso stars.
 
@@ -264,43 +307,49 @@ if __name__ == "__main__":
             ti[j] = t[ind][par_ind]
         ts.append(ti)
 
-    args = [mods, d.period.values, d.period_err.values, d.bv.values,
-            d.bv_err.values, par_inds_list]
-    flat, lnprobs = gibbs_control(params, lnprob, nsteps, niter, ts,
-                                  par_inds_list, args)
+    # Sample posteriors using either MH gibbs or emcee
+    if run_MH:
+        args = [mods, d.period.values, d.period_err.values, d.bv.values,
+                d.bv_err.values, par_inds_list]
+        flat, lnprobs = gibbs_control(params, lnprob, nsteps, niter, ts,
+                                    par_inds_list, args)
 
-    # emcee_args = [mods, d.period.values, d.period_err.values, d.bv.values,
-    #               d.bv_err.values, par_inds_list[0]]
-    # nwalkers, nsteps, ndim = 64, 1000, len(params)
-    # p0 = [1e-4*np.random.rand(ndim) + params for i in range(nwalkers)]
-    # sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=emcee_args)
-    # print("burning in...")
-    # pos, _, _ = sampler.run_mcmc(p0, 100)
-    # sampler.reset()
-    # print("production run...")
-    # sampler.run_mcmc(pos, nsteps)
-    # flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
+        # Throw away _number_ Gibbs iterations as burn in.
+        number = 1
+        burnin = nsteps * number * 2
+        flat = flat[burnin:, :]
 
-    # f = h5py.File("emcee_posterior_samples.h5", "w")
-    # data = f.create_dataset("samples", np.shape(flat))
-    # data[:, :] = flat
-    # f.close()
+    else:
+        emcee_args = [mods, d.period.values, d.period_err.values, d.bv.values,
+                    d.bv_err.values, par_inds_list[0]]
+        nwalkers, nsteps, ndim = 64, 10000, len(params)
+        p0 = [1e-4*np.random.rand(ndim) + params for i in range(nwalkers)]
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob,
+                                        args=emcee_args)
+        print("burning in...")
+        pos, _, _ = sampler.run_mcmc(p0, 3000)
+        sampler.reset()
+        print("production run...")
+        sampler.run_mcmc(pos, nsteps)
+        flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
 
-    # Throw away _number_ Gibbs iterations as burn in.
-    # number = 5
-    # burnin = nsteps * number * 2
-    # flat = flat[burnin:, :]
+        f = h5py.File("emcee_posterior_samples.h5", "w")
+        data = f.create_dataset("samples", np.shape(flat))
+        data[:, :] = flat
+        f.close()
 
     end = time.time()
     print("Time taken = ", (end - start)/60, "minutes")
 
     print("Plotting results and traces")
     plt.clf()
-    plt.plot(lnprobs)
-    # plt.plot(sampler.lnprobability.T)
+    if run_MH:
+        plt.plot(lnprobs)
+    else:
+        plt.plot(sampler.lnprobability.T)
     plt.xlabel("Time")
     plt.ylabel("ln (probability)")
-    plt.savefig("prob_trace")
+    plt.savefig(os.path.join(RESULTS_DIR, "prob_trace"))
 
     print("Making corner plot")
     truths = [.7725, .601, .5189, np.log(1), None, None, np.log(4.56),
@@ -312,12 +361,14 @@ if __name__ == "__main__":
                 "$\ln(D_1)$", "$\ln(D_2)$", "$\ln(D_3)$", "$A_{v1}$",
                 "$A_{v2}$", "$A_{v3}$"]
     fig = corner.corner(flat, truths=truths, labels=labels)
-    fig.savefig("corner_gibbs_for_realz")
+    fig.savefig(os.path.join(RESULTS_DIR, "demo_corner_gibbs"))
 
     # Plot chains
     ndim = len(params)
     for i in range(ndim):
         plt.clf()
-        plt.plot(flat[:, i].T, alpha=.5)
-        # plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
-        plt.savefig("{}_trace".format(i))
+        if run_MH:
+            plt.plot(flat[:, i].T, alpha=.5)
+        else:
+            plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
+        plt.savefig(os.path.join(RESULTS_DIR, "{}_trace".format(i)))
