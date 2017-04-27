@@ -235,7 +235,8 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
     n_parameter_sets = len(par_inds_list)
 
     # Final sample array
-    all_samples = np.zeros((nsteps * 2 * niter, ndim))
+    all_samples = np.zeros((nsteps * niter, ndim))
+    # all_samples = np.zeros((nsteps * 2 * niter, ndim))
 
     # assert len(par_inds_list[0]) == len(par), "You should sample all the " \
         # "parameters first!"
@@ -287,7 +288,7 @@ if __name__ == "__main__":
 
     start = time.time()  # timeit
 
-    nsteps, niter = 10000, 5
+    nsteps, niter = 10000, 2
 
     # Construct parameter indices for the different parameter sets.
     par_inds = np.arange(len(params))  # All
@@ -299,7 +300,8 @@ if __name__ == "__main__":
         par_inds_list.append(par_inds[3+i::N])  # Iso stars.
 
     # Create the covariance matrices.
-    t = .1*estimate_covariance()
+    t = estimate_covariance()
+    t[3:] *= 1e-2  # FIXME
     ts = []
     for i, par_ind in enumerate(par_inds_list):
         ti = np.zeros((len(par_ind), len(par_ind)))
@@ -315,9 +317,10 @@ if __name__ == "__main__":
                                     par_inds_list, args)
 
         # Throw away _number_ Gibbs iterations as burn in.
-        number = 1
-        burnin = nsteps * number * 2
-        flat = flat[burnin:, :]
+        # number = 1
+        # burnin = nsteps * number
+        # # burnin = nsteps * number * 2
+        # flat = flat[burnin:, :]
 
     else:
         emcee_args = [mods, d.period.values, d.period_err.values, d.bv.values,
@@ -364,11 +367,13 @@ if __name__ == "__main__":
     fig.savefig(os.path.join(RESULTS_DIR, "demo_corner_gibbs"))
 
     # Plot chains
+    cols = ["b", "g", "m", "r"]
     ndim = len(params)
     for i in range(ndim):
         plt.clf()
         if run_MH:
-            plt.plot(flat[:, i].T, alpha=.5)
+            for j in range(4):
+                plt.plot(flat[j*nsteps: (j+1)*nsteps, i].T, cols[j], alpha=.5)
         else:
             plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
         plt.savefig(os.path.join(RESULTS_DIR, "{}_trace".format(i)))
