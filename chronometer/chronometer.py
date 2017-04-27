@@ -57,18 +57,6 @@ def lnlike(params, *args):
             gyro_lnlike = sum(-.5*((period - gyro_model(params, bv))
                                     /period_errs)**2)
 
-        # If gyro and all stars.
-        elif len(par_inds) == 3 + 5*N:
-            g_par_inds = np.concatenate((par_inds[:3], par_inds[3+N:3+2*N]))
-            gyro_lnlike =  sum(-.5*((period - gyro_model(params[g_par_inds],
-                                                bv))/period_errs)**2)
-            p = params*1
-            p[3:3+N] = np.exp(p[3:3+N])
-            p[3+N:3+2*N] = np.log10(1e9*np.exp(p[3+N:3+2*N]))
-            p[3+3*N:3+4*N] = np.exp(p[3+3*N:3+4*N])
-            iso_lnlike = sum([mods[i].lnlike(p[3+i::N]) for i in
-                              range(len(mods))])
-
     # If not gyro but single stars
     else:
         mod_inds = par_inds[0] - 3
@@ -238,9 +226,6 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
     all_samples = np.zeros((nsteps * niter, ndim))
     # all_samples = np.zeros((nsteps * 2 * niter, ndim))
 
-    # assert len(par_inds_list[0]) == len(par), "You should sample all the " \
-        # "parameters first!"
-
     # Iterate over niter cycles of parameter sets.
     probs = []
     for i in range(niter):  # Loop over Gibbs repeats.
@@ -250,12 +235,6 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
             args[-1] = par_inds_list[k]
             samples, par, pb = MH(par, lnprob, nsteps, t[k], *args)
             all_samples[nsteps*i:nsteps*(i+1), par_inds_list[k]] = samples
-            # if len(par_inds_list[k]) == len(par):  # If sampling all params:
-            #     all_samples[nsteps*i*2:nsteps*((i*2)+1),
-            #                 par_inds_list[k]] = samples
-            # else:  # if sampling (non-overlapping) parameter subsets:
-            #     all_samples[nsteps*((i*2)+1):nsteps*((i*2)+2),
-            #                 par_inds_list[k]] = samples
             probs.append(pb)
 
 
@@ -272,6 +251,16 @@ def estimate_covariance():
     return np.cov(samples, rowvar=False)
 
 
+def find_optimum():
+    """
+    Return the covariance matrix of the emcee samples.
+    """
+    with h5py.File("emcee_posterior_samples.h5", "r") as f:
+        samples = f["samples"][...]
+    ndim = np.shape(samples)[1]
+    return np.array([np.median(samples[:, i]) for i in range(ndim)])
+
+
 if __name__ == "__main__":
 
     # Use Metropolis hastings or emcee?
@@ -285,10 +274,11 @@ if __name__ == "__main__":
 
     # Generate the initial parameter array and the mods objects from the data.
     params, mods = pars_and_mods(DATA_DIR)
+    params = find_optimum()
 
     start = time.time()  # timeit
 
-    nsteps, niter = 10000, 2
+    nsteps, niter = 10000, 10
 
     # Construct parameter indices for the different parameter sets.
     par_inds = np.arange(len(params))  # All
@@ -300,8 +290,8 @@ if __name__ == "__main__":
         par_inds_list.append(par_inds[3+i::N])  # Iso stars.
 
     # Create the covariance matrices.
-    t = estimate_covariance()
-    t[3:] *= 1e-2  # FIXME
+    t = .1*estimate_covariance()  # FIXME
+    # t[3:] *= 1e-2  # FIXME
     ts = []
     for i, par_ind in enumerate(par_inds_list):
         ti = np.zeros((len(par_ind), len(par_ind)))
@@ -345,9 +335,12 @@ if __name__ == "__main__":
     print("Time taken = ", (end - start)/60, "minutes")
 
     print("Plotting results and traces")
+    cols = ["b", "g", "m", "r"]
     plt.clf()
     if run_MH:
-        plt.plot(lnprobs)
+        for j in range(4*niter - 1):
+            x = np.arange(j*nsteps, (j+1)*nsteps)
+            plt.plot(x, lnprobs[j*nsteps: (j+1)*nsteps], cols[j%4])
     else:
         plt.plot(sampler.lnprobability.T)
     plt.xlabel("Time")
@@ -366,14 +359,16 @@ if __name__ == "__main__":
     fig = corner.corner(flat, truths=truths, labels=labels)
     fig.savefig(os.path.join(RESULTS_DIR, "demo_corner_gibbs"))
 
+    print(np.shape(flat))
     # Plot chains
-    cols = ["b", "g", "m", "r"]
     ndim = len(params)
     for i in range(ndim):
         plt.clf()
         if run_MH:
-            for j in range(4):
-                plt.plot(flat[j*nsteps: (j+1)*nsteps, i].T, cols[j], alpha=.5)
+            for j in range(niter):
+                x = np.arange(j*nsteps, (j+1)*nsteps)
+                plt.plot(x, flat[j*nsteps: (j+1)*nsteps, i].T, cols[j],
+                         alpha=.5)
         else:
             plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
         plt.savefig(os.path.join(RESULTS_DIR, "{}_trace".format(i)))
