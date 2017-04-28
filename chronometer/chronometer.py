@@ -52,11 +52,8 @@ def lnlike(params, *args):
     gyro_lnlike, iso_lnlike = 0, 0
     if par_inds[0] == 0 and par_inds[1] == 1 and par_inds[2] == 2: # if gyro.
 
-        # If just gyro.
-        if len(par_inds) == 3 + N:
-            gyro_lnlike = sum(-.5*((period - gyro_model(params, bv))
-                                    /period_errs)**2)
-                               /period_errs)**2)
+        gyro_lnlike = sum(-.5*((period - gyro_model(params, bv))
+                                /period_errs)**2)
 
     # If not gyro but single stars
     else:
@@ -221,11 +218,11 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
     """
 
     ndim = len(par)
+    nstars = len(args[0])
     n_parameter_sets = len(par_inds_list)
 
     # Final sample array
-    all_samples = np.zeros((nsteps * niter, ndim))
-    # all_samples = np.zeros((nsteps * 2 * niter, ndim))
+    all_samples = np.zeros((nsteps * niter, ndim + nstars))
 
     # Iterate over niter cycles of parameter sets.
     probs = []
@@ -235,7 +232,13 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
         for k in range(len(par_inds_list)):  # loop over parameter sets.
             args[-1] = par_inds_list[k]
             samples, par, pb = MH(par, lnprob, nsteps, t[k], *args)
-            all_samples[nsteps*i:nsteps*(i+1), par_inds_list[k]] = samples
+            if par_inds_list[k][0] == 0:  # save age samples separately
+                all_samples[nsteps*i:nsteps*(i+1), par_inds_list[k][:3]] = \
+                    samples[:, :3]
+                all_samples[nsteps*i:nsteps*(i+1), -nstars:] = \
+                    samples[:, 3:]
+            else:
+                all_samples[nsteps*i:nsteps*(i+1), par_inds_list[k]] = samples
             probs.append(pb)
 
 
@@ -280,12 +283,11 @@ if __name__ == "__main__":
     start = time.time()  # timeit
 
     nsteps, niter = 1000, 5
+    N = len(mods)
 
     # Construct parameter indices for the different parameter sets.
     par_inds = np.arange(len(params))  # All
     gyro_par_inds = np.concatenate((par_inds[:3], par_inds[3+N:3+2*N])) # Gyro
-    # par_inds_list = [par_inds, gyro_par_inds]
-    gyro_par_inds = par_inds[:3]
     par_inds_list = [gyro_par_inds]
     for i in range(N):
         par_inds_list.append(par_inds[3+i::N])  # Iso stars.
@@ -348,10 +350,19 @@ if __name__ == "__main__":
     plt.savefig(os.path.join(RESULTS_DIR, "prob_trace"))
 
     labels = ["$a$", "$b$", "$n$", "$\ln(Mass_1)$", "$\ln(Mass_2)$",
-                "$\ln(Mass_3)$", "$\ln(Age_1)$", "$\ln(Age_2)$",
-                "$\ln(Age_3)$", "$[Fe/H]_1$", "$[Fe/H]_2$", "$[Fe/H]_3$",
-                "$\ln(D_1)$", "$\ln(D_2)$", "$\ln(D_3)$", "$A_{v1}$",
-                "$A_{v2}$", "$A_{v3}$"]
+              "$\ln(Mass_3)$", "$\ln(Age_{1,i})$", "$\ln(Age_{2,i])$",
+              "$\ln(Age_{3,i})$", "$[Fe/H]_1$", "$[Fe/H]_2$", "$[Fe/H]_3$",
+              "$\ln(D_1)$", "$\ln(D_2)$", "$\ln(D_3)$", "$A_{v1}$",
+              "$A_{v2}$", "$A_{v3}$", "$\ln(Age_{1,g})$",
+              "$\ln(Age_{2,g})$", "$\ln(Age_{3,g})$"]
+
+    ages = np.zeros((np.shape(flat)[0]*2, nstars))
+    for i in range(nstars):
+        ages[:, i] = np.concatenate((flat[:, 3+2*N+i], flat[:, 3+6*N+i]))
+        plt.clf()
+        plt.plot(ages[:, i])
+        plt.ylim("age {}".format(i))
+        plt.savefig("age_{}_chain".format(i))
 
     # Plot chains
     ndim = len(params)
