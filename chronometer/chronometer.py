@@ -285,7 +285,7 @@ if __name__ == "__main__":
     start = time.time()  # timeit
 
     # Different nsteps for different parameters. gyro, star 1, 2, 3.
-    nsteps = [0, 100, 0, 0]
+    nsteps = [0, 10000, 0, 0]
     niter = 2
     N = len(mods)
 
@@ -348,9 +348,9 @@ if __name__ == "__main__":
     print("Plotting results and traces")
     plt.clf()
     if run_MH:
-        for j in range(nsteps*niter - 1):
-                x = np.arange(j*nsteps[i], (j+1)*nsteps[i])
-                plt.plot(x, lnprobs[j*nsteps[i]: (j+1)*nsteps[i]])
+        for j in range(nsteps[1]*niter - 1):
+                x = np.arange(j*nsteps[1], (j+1)*nsteps[1])
+                plt.plot(x, lnprobs[j*nsteps[1]: (j+1)*nsteps[1]])
     else:
         plt.plot(sampler.lnprobability.T)
     plt.xlabel("Time")
