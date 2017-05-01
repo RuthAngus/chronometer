@@ -220,6 +220,15 @@ def estimate_covariance():
     return np.cov(samples, rowvar=False)
 
 
+def estimate_covariance():
+    """
+    Return the covariance matrix of the emcee samples.
+    """
+    with h5py.File("emcee_posterior_samples.h5", "r") as f:
+        samples = f["samples"][...]
+    return np.cov(samples, rowvar=False)
+
+
 if __name__ == "__main__":
 
     # Use Metropolis hastings or emcee?
@@ -236,12 +245,13 @@ if __name__ == "__main__":
 
     start = time.time()  # timeit
 
-    nsteps, niter = 1000, 10
+    nsteps, niter = 1000, 5
 
     # Construct parameter indices for the different parameter sets.
     par_inds_list = np.arange(len(params))
 
-    t = np.ones(len(params)) * 1e-1
+    t = estimate_covariance()[0]
+    # t = np.ones(len(params)) * 1e-1
     # t = np.array([7e-2, 7e-2, 7e-2, 1e-5, 1e-5, 1e-5, 1e-2, 1e-2, 1e-2,
     #               1e-1, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3])
 
@@ -277,7 +287,7 @@ if __name__ == "__main__":
                 "$A_{v2}$", "$A_{v3}$"]
     print(np.shape(flat), "Sample shape")
     fig = corner.corner(flat, truths=truths, labels=labels)
-    fig.savefig(os.path.join(RESULTS_DIR, "demo_corner_gibbs"))
+    fig.savefig(os.path.join(RESULTS_DIR, "mini_corner_gibbs"))
 
     print("Plotting chains...")
     ndim = len(params)
