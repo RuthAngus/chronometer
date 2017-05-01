@@ -51,7 +51,6 @@ def lnlike(params, *args):
     N = len(period)
     gyro_lnlike, iso_lnlike = 0, 0
     if par_inds[0] == 0 and par_inds[1] == 1 and par_inds[2] == 2: # if gyro.
-
         gyro_lnlike = sum(-.5*((period - gyro_model(params, bv))
                                 /period_errs)**2)
 
@@ -152,7 +151,8 @@ def MH(par, lnprob, nsteps, t, *args):
         accept += acc
         probs.append(new_prob)
         samples[i, :] = par[par_inds]
-    print("Acceptance fraction = ", accept/float(nsteps))
+    if nsteps > 0:
+        print("Acceptance fraction = ", accept/float(nsteps))
     return samples, par, probs
 
 
@@ -188,7 +188,7 @@ def MH_step(par, lnprob, t, *args, emc=False):
     return par, new_lnprob, accept
 
 
-def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
+def gibbs_control(par, lnprob, nsteps_list, niter, t, par_inds_list, args):
     """
     This function tells the metropolis hastings what parameters to sample in.
     params:
@@ -222,7 +222,7 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
     n_parameter_sets = len(par_inds_list)
 
     # Final sample array
-    all_samples = np.zeros((nsteps * niter, ndim + nstars))
+    all_samples = np.zeros((sum(nsteps_list) * niter, ndim + nstars))
 
     # Iterate over niter cycles of parameter sets.
     probs = []
@@ -230,6 +230,8 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
         print("Gibbs iteration ", i, "of ", niter)
         print(par)
         for k in range(len(par_inds_list)):  # loop over parameter sets.
+            nsteps = nsteps_list[i]
+            print(nsteps, "steps")
             args[-1] = par_inds_list[k]
             samples, par, pb = MH(par, lnprob, nsteps, t[k], *args)
             if par_inds_list[k][0] == 0:  # save age samples separately
@@ -282,7 +284,9 @@ if __name__ == "__main__":
 
     start = time.time()  # timeit
 
-    nsteps, niter = 1000, 5
+    # Different nsteps for different parameters. gyro, star 1, 2, 3.
+    nsteps = [0, 100, 0, 0]
+    niter = 2
     N = len(mods)
 
     # Construct parameter indices for the different parameter sets.
@@ -293,8 +297,8 @@ if __name__ == "__main__":
         par_inds_list.append(par_inds[3+i::N])  # Iso stars.
 
     # Create the covariance matrices.
-    t = .1*estimate_covariance()  # FIXME
-    # t[3:] *= 1e-2  # FIXME
+    t = estimate_covariance()
+    # t[3:] *= 1e-2
     ts = []
     for i, par_ind in enumerate(par_inds_list):
         ti = np.zeros((len(par_ind), len(par_ind)))
@@ -304,6 +308,10 @@ if __name__ == "__main__":
 
     # Sample posteriors using either MH gibbs or emcee
     if run_MH:
+        # args = [[mods[0]], np.array([d.period.values[0]]),
+        #         np.array([d.period_err.values[0]]),
+        #         np.array([d.bv.values[0]]), np.array([d.bv_err.values[0]]),
+        #         np.array([par_inds_list[1]])]
         args = [mods, d.period.values, d.period_err.values, d.bv.values,
                 d.bv_err.values, par_inds_list]
         flat, lnprobs = gibbs_control(params, lnprob, nsteps, niter, ts,
@@ -340,9 +348,9 @@ if __name__ == "__main__":
     print("Plotting results and traces")
     plt.clf()
     if run_MH:
-        for j in range(4*niter - 1):
-            x = np.arange(j*nsteps, (j+1)*nsteps)
-            plt.plot(x, lnprobs[j*nsteps: (j+1)*nsteps])
+        for j in range(nsteps*niter - 1):
+                x = np.arange(j*nsteps[i], (j+1)*nsteps[i])
+                plt.plot(x, lnprobs[j*nsteps[i]: (j+1)*nsteps[i]])
     else:
         plt.plot(sampler.lnprobability.T)
     plt.xlabel("Time")
@@ -350,19 +358,22 @@ if __name__ == "__main__":
     plt.savefig(os.path.join(RESULTS_DIR, "prob_trace"))
 
     labels = ["$a$", "$b$", "$n$", "$\ln(Mass_1)$", "$\ln(Mass_2)$",
-              "$\ln(Mass_3)$", "$\ln(Age_{1,i})$", "$\ln(Age_{2,i])$",
+              "$\ln(Mass_3)$", "$\ln(Age_{1,i})$", "$\ln(Age_{2,i})$",
               "$\ln(Age_{3,i})$", "$[Fe/H]_1$", "$[Fe/H]_2$", "$[Fe/H]_3$",
               "$\ln(D_1)$", "$\ln(D_2)$", "$\ln(D_3)$", "$A_{v1}$",
               "$A_{v2}$", "$A_{v3}$", "$\ln(Age_{1,g})$",
               "$\ln(Age_{2,g})$", "$\ln(Age_{3,g})$"]
 
-    ages = np.zeros((np.shape(flat)[0]*2, nstars))
-    for i in range(nstars):
-        ages[:, i] = np.concatenate((flat[:, 3+2*N+i], flat[:, 3+6*N+i]))
+    # labels = ["$\ln(Mass_1)$", "$\ln(Age_{1,i})$", "$[Fe/H]_1$", "$\ln(D_1)$",
+              # "$A_{v1}$"]
+
+    ages = np.zeros((np.shape(flat)[0]*2, N))
+    for i in range(N):
+        ages[:, i] = np.concatenate((flat[:, 3+N+i], flat[:, 3+5*N+i]))
         plt.clf()
         plt.plot(ages[:, i])
-        plt.ylim("age {}".format(i))
-        plt.savefig("age_{}_chain".format(i))
+        plt.ylabel("age {}".format(i))
+        plt.savefig(os.path.join(RESULTS_DIR, "age_{}_chain".format(i)))
 
     # Plot chains
     ndim = len(params)
@@ -370,8 +381,8 @@ if __name__ == "__main__":
         plt.clf()
         if run_MH:
             for j in range(niter):
-                x = np.arange(j*nsteps, (j+1)*nsteps)
-                plt.plot(x, flat[j*nsteps: (j+1)*nsteps, i].T)
+                x = np.arange(j*nsteps[1], (j+1)*nsteps[1])  # FIXME
+                plt.plot(x, flat[j*nsteps[1]: (j+1)*nsteps[1], i].T)
                 plt.ylabel(labels[i])
         else:
             plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
@@ -379,7 +390,9 @@ if __name__ == "__main__":
 
     print("Making corner plot")
     truths = [.7725, .601, .5189, np.log(1), None, None, np.log(4.56),
-            np.log(2.5), np.log(2.5), 0., None, None, np.log(10),
-            np.log(2400), np.log(2400), 0., None, None]
+              np.log(2.5), np.log(2.5), 0., None, None, np.log(10),
+              np.log(2400), np.log(2400), 0., None, None, np.log(4.56),
+              np.log(2.5), np.log(2.5)]
+    # truths = [np.log(1), np.log(4.56), 0., np.log(10), 0.]
     fig = corner.corner(flat, truths=truths, labels=labels)
     fig.savefig(os.path.join(RESULTS_DIR, "demo_corner_gibbs"))
