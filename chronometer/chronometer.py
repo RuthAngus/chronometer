@@ -230,8 +230,8 @@ def gibbs_control(par, lnprob, nsteps_list, niter, t, par_inds_list, args):
         print("Gibbs iteration ", i, "of ", niter)
         print(par)
         for k in range(len(par_inds_list)):  # loop over parameter sets.
-            nsteps = nsteps_list[i]
-            print(nsteps, "steps")
+            nsteps = nsteps_list[k]
+            print(nsteps, "steps", "parameter_indices = ", par_inds_list[k])
             args[-1] = par_inds_list[k]
             samples, par, pb = MH(par, lnprob, nsteps, t[k], *args)
             if par_inds_list[k][0] == 0:  # save age samples separately
@@ -285,7 +285,7 @@ if __name__ == "__main__":
     start = time.time()  # timeit
 
     # Different nsteps for different parameters. gyro, star 1, 2, 3.
-    nsteps = [0, 10000, 0, 0]
+    nsteps = [0, 100000, 0, 0]
     niter = 2
     N = len(mods)
 
@@ -345,17 +345,17 @@ if __name__ == "__main__":
     end = time.time()
     print("Time taken = ", (end - start)/60, "minutes")
 
-    print("Plotting results and traces")
-    plt.clf()
-    if run_MH:
-        for j in range(nsteps[1]*niter - 1):
-                x = np.arange(j*nsteps[1], (j+1)*nsteps[1])
-                plt.plot(x, lnprobs[j*nsteps[1]: (j+1)*nsteps[1]])
-    else:
-        plt.plot(sampler.lnprobability.T)
-    plt.xlabel("Time")
-    plt.ylabel("ln (probability)")
-    plt.savefig(os.path.join(RESULTS_DIR, "prob_trace"))
+    # print("Plotting results and traces")
+    # plt.clf()
+    # if run_MH:
+    #     for j in range(nsteps[1]*niter - 1):
+    #             x = np.arange(j*nsteps[1], (j+1)*nsteps[1])
+    #             plt.plot(x, lnprobs[j*nsteps[1]: (j+1)*nsteps[1]])
+    # else:
+    #     plt.plot(sampler.lnprobability.T)
+    # plt.xlabel("Time")
+    # plt.ylabel("ln (probability)")
+    # plt.savefig(os.path.join(RESULTS_DIR, "prob_trace"))
 
     labels = ["$a$", "$b$", "$n$", "$\ln(Mass_1)$", "$\ln(Mass_2)$",
               "$\ln(Mass_3)$", "$\ln(Age_{1,i})$", "$\ln(Age_{2,i})$",
@@ -363,9 +363,6 @@ if __name__ == "__main__":
               "$\ln(D_1)$", "$\ln(D_2)$", "$\ln(D_3)$", "$A_{v1}$",
               "$A_{v2}$", "$A_{v3}$", "$\ln(Age_{1,g})$",
               "$\ln(Age_{2,g})$", "$\ln(Age_{3,g})$"]
-
-    # labels = ["$\ln(Mass_1)$", "$\ln(Age_{1,i})$", "$[Fe/H]_1$", "$\ln(D_1)$",
-              # "$A_{v1}$"]
 
     ages = np.zeros((np.shape(flat)[0]*2, N))
     for i in range(N):
@@ -393,6 +390,7 @@ if __name__ == "__main__":
               np.log(2.5), np.log(2.5), 0., None, None, np.log(10),
               np.log(2400), np.log(2400), 0., None, None, np.log(4.56),
               np.log(2.5), np.log(2.5)]
-    # truths = [np.log(1), np.log(4.56), 0., np.log(10), 0.]
+    flat = np.vstack((flat[:, 3], flat[:, 6], flat[:, 9], flat[:, 12],
+                      flat[:, 15])).T  # FIXME
     fig = corner.corner(flat, truths=truths, labels=labels)
     fig.savefig(os.path.join(RESULTS_DIR, "demo_corner_gibbs"))
