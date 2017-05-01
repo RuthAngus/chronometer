@@ -113,7 +113,7 @@ def MH(par, lnprob, nsteps, t, mod, emc=False):
     return samples, par, probs
 
 
-def MH_step(par, lnprob, t, *args, emc=True):
+def MH_step(par, lnprob, t, *args, emc=False):
     if emc:
         nwalkers, ndim = 10, len(par)
         p0 = [par + np.random.multivariate_normal(np.zeros((len(par))), t)
