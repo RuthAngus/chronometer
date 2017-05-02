@@ -35,3 +35,16 @@ def gyro_model(params, bv):
     N = len(bv)
     ln_age = params[3:3+N]
     return a*(np.exp(ln_age)*1e3)**n * (bv - .4)**b
+
+
+def action_age(Jz):
+    """
+    Given a vertical action, calculate an age.
+    Vertical action dispersion increases with time.
+    Vertical action is drawn from a Normal distribution with zero mean and
+    dispersion that is a function of time.
+    Calculate the dispersion from the action and convert that into an age
+    using a power law model.
+    This will need to be mass dependent eventually.
+    """
+    return
