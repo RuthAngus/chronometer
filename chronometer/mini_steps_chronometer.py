@@ -122,8 +122,8 @@ def MH(par, lnprob, nsteps, t, *args):
 
     accept, probs = 0, []
     for i in range(nsteps):
-        par, new_prob, acc = MH_step(par[par_inds], lnprob, t[par_inds],
-                                     *args)
+        par[par_inds], new_prob, acc = MH_step(par, par[par_inds], lnprob,
+                                               t[par_inds], *args)
         accept += acc
         probs.append(new_prob)
         samples[i, :] = par[par_inds]
@@ -131,7 +131,7 @@ def MH(par, lnprob, nsteps, t, *args):
     return samples, par, probs
 
 
-def MH_step(par1, lnprob, t, *args):
+def MH_step(params, par1, lnprob, t, *args):
     """
     A single Metropolis Hastings step.
     if emc = True, the step is an emcee step instead.
@@ -141,7 +141,7 @@ def MH_step(par1, lnprob, t, *args):
     """
     par_ind = args[-1]
     one_par = par1 + np.random.randn(1) * t
-    params = args[-2]*1
+    # params = args[-2]*1
     newp = args[-2]*1
     newp[par_ind] = one_par
     new_lnprob = lnprob(newp, *args)
@@ -157,7 +157,7 @@ def MH_step(par1, lnprob, t, *args):
         else:
             accept = 0
             new_lnprob = lnprob(params, *args)
-    return params, new_lnprob, accept
+    return params[par_ind], new_lnprob, accept
 
 
 def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
@@ -199,7 +199,6 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
     probs = []
     for i in range(niter):  # Loop over Gibbs repeats.
         print("Gibbs iteration ", i, "of ", niter)
-        print(par)
         for k in range(len(par_inds_list)):  # loop over parameter sets.
             args[-1] = par_inds_list[k]
             samples, par, pb = MH(par, lnprob, nsteps, t, *args)
@@ -245,12 +244,12 @@ if __name__ == "__main__":
 
     start = time.time()  # timeit
 
-    nsteps, niter = 1000, 5
+    nsteps, niter = 100000, 20
 
     # Construct parameter indices for the different parameter sets.
     par_inds_list = np.arange(len(params))
 
-    t = estimate_covariance()[0]
+    t = estimate_covariance()[0] * 1e-1  # FIXME
     # t = np.ones(len(params)) * 1e-1
     # t = np.array([7e-2, 7e-2, 7e-2, 1e-5, 1e-5, 1e-5, 1e-2, 1e-2, 1e-2,
     #               1e-1, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3])
@@ -262,7 +261,7 @@ if __name__ == "__main__":
                                 par_inds_list, args)
 
     # Throw away _number_ Gibbs iterations as burn in.
-    number = 2
+    number = 10
     burnin = nsteps * number
     flat = flat[burnin:, :]
 
