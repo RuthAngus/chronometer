@@ -40,6 +40,7 @@ def lnlike(params, mod):
     par_inds: (array)
         The parameters to vary.
     """
+    print(params, mod)
     p = params*1
     p[0] = np.exp(p[0])
     p[1] = np.log10(1e9*np.exp(p[1]))
@@ -54,9 +55,10 @@ def lnprior(params):
     age_prior = np.log(priors.age_prior(np.log10(1e9*np.exp(params[1]))))
     feh_prior = np.log(priors.feh_prior(params[2]))
     distance_prior = np.log(priors.distance_prior(np.exp(params[3])))
+
     m = (-20 < params) * (params < 20)  # Broad bounds on all params.
-    Av = params[4]
-    mAv = (0 <= Av) * (Av < 1)
+    mAv = (0 <= params[4]) * (params[4] < 1)
+
     if sum(m) == len(m) and mAv:
         return age_prior + feh_prior + distance_prior
     else:
@@ -71,6 +73,8 @@ def lnprob(params, mod):
     mod: (list)
         list of pre-computed star model objects.
     """
+    print(lnlike(params, mod), lnprior(params))
+    input("e")
     return lnlike(params, mod) + lnprior(params)
 
 
@@ -150,7 +154,10 @@ if __name__ == "__main__":
     par_inds = np.array([3, 6, 9, 12, 15])
     mods = mods[0]
 
-    nsteps = 1000
+    lnprob(params, mods)
+    input('e')
+
+    nsteps = 10000
 
     with h5py.File("emcee_posterior_samples.h5", "r") as f:
         samples = f["samples"][...]

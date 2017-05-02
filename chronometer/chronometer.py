@@ -84,23 +84,33 @@ def emcee_lnprob(params, *args):
     return gyro_lnlike + iso_lnlike + lnprior(params)
 
 
-def lnprior(params):
+def lnprior(params, *args):
     """
     lnprior on all parameters.
     """
-    N = int(len(params - 3)/5)  # Number of stars
-    age_prior = sum([np.log(priors.age_prior(np.log10(1e9*np.exp(i))))
-                     for i in params[3+N:3+2*N]])
-    feh_prior = sum([np.log(priors.feh_prior(i)) for i in
-                     params[3+2*N:3+3*N]])
-    distance_prior = sum([np.log(priors.distance_prior(np.exp(i))) for i
-                          in params[3+3*N:3+4*N]])
-    g_prior = priors.lng_prior(params[:3])
+    par_inds = args[-1]
+
+    # if gyro.
+    if par_inds[0] == 0 and par_inds[1] == 1 and par_inds[2] == 2:
+        g_prior = priors.lng_prior(params[:3])
+        age_prior = sum([np.log(priors.age_prior(np.log10(1e9*np.exp(i))))
+                        for i in params[3:]])
+        feh_prior = 0.
+        distance_prior = 0.
+        mAv = True
+
+    # If individual stars
+    else:
+        g_prior = 0.
+        age_prior = np.log(priors.age_prior(np.log10(1e9*np.exp(params[1]))))
+        feh_prior = np.log(priors.feh_prior(params[2]))
+        distance_prior = np.log(priors.distance_prior(np.exp(params[3])))
+
     m = (-20 < params) * (params < 20)  # Broad bounds on all params.
-    Av = params[3+4*N:3+5*N]
-    mAv = (0 <= Av) * (Av < 1)
-    if sum(m) == len(m) and sum(mAv) == len(mAv):
-        return age_prior + feh_prior + distance_prior + g_prior #+ Av_prior
+    mAv = (0 <= params[4]) * (params[4] < 1)  # Prior on A_v
+
+    if sum(m) == len(m) and mAv:
+        return g_prior + age_prior + feh_prior + distance_prior
     else:
         return -np.inf
 
@@ -114,7 +124,7 @@ def lnprob(params, *args):
         args to pass to lnlike, including mods, a list of pre-computed star
         model objects.
     """
-    return lnlike(params, *args) + lnprior(params)
+    return lnlike(params, *args) + lnprior(params, *args)
 
 
 def MH(par, lnprob, nsteps, t, *args):
@@ -233,7 +243,8 @@ def gibbs_control(par, lnprob, nsteps_list, niter, t, par_inds_list, args):
             nsteps = nsteps_list[k]
             print(nsteps, "steps", "parameter_indices = ", par_inds_list[k])
             args[-1] = par_inds_list[k]
-            samples, par, pb = MH(par, lnprob, nsteps, t[k], *args)
+            samples, par, pb = MH(par, lnprob, nsteps, t[k],
+                                                   *args)
             if par_inds_list[k][0] == 0:  # save age samples separately
                 all_samples[nsteps*i:nsteps*(i+1), par_inds_list[k][:3]] = \
                     samples[:, :3]
@@ -259,7 +270,7 @@ def estimate_covariance():
 
 def find_optimum():
     """
-    Return the covariance matrix of the emcee samples.
+    Return the median of the emcee samples.
     """
     with h5py.File("emcee_posterior_samples.h5", "r") as f:
         samples = f["samples"][...]
@@ -280,13 +291,13 @@ if __name__ == "__main__":
 
     # Generate the initial parameter array and the mods objects from the data.
     params, mods = pars_and_mods(DATA_DIR)
-    params = find_optimum()
+    # params = find_optimum()
 
     start = time.time()  # timeit
 
     # Different nsteps for different parameters. gyro, star 1, 2, 3.
-    nsteps = [0, 100000, 0, 0]
-    niter = 2
+    nsteps = [1000, 1000, 1000, 1000]
+    niter = 4
     N = len(mods)
 
     # Construct parameter indices for the different parameter sets.
@@ -298,7 +309,6 @@ if __name__ == "__main__":
 
     # Create the covariance matrices.
     t = estimate_covariance()
-    # t[3:] *= 1e-2
     ts = []
     for i, par_ind in enumerate(par_inds_list):
         ti = np.zeros((len(par_ind), len(par_ind)))
@@ -311,17 +321,17 @@ if __name__ == "__main__":
         # args = [[mods[0]], np.array([d.period.values[0]]),
         #         np.array([d.period_err.values[0]]),
         #         np.array([d.bv.values[0]]), np.array([d.bv_err.values[0]]),
-        #         np.array([par_inds_list[1]])]
+        #         np.array(par_inds_list[1])]
         args = [mods, d.period.values, d.period_err.values, d.bv.values,
                 d.bv_err.values, par_inds_list]
         flat, lnprobs = gibbs_control(params, lnprob, nsteps, niter, ts,
                                     par_inds_list, args)
 
         # Throw away _number_ Gibbs iterations as burn in. FIXME
-        # number = 1
-        # burnin = nsteps * number
-        # # burnin = nsteps * number * 2
-        # flat = flat[burnin:, :]
+        number = 1
+        burnin = nsteps[0] * number
+        # burnin = nsteps * number * 2
+        flat = flat[burnin:, :]
 
     else:
         emcee_args = [mods, d.period.values, d.period_err.values, d.bv.values,
@@ -345,17 +355,22 @@ if __name__ == "__main__":
     end = time.time()
     print("Time taken = ", (end - start)/60, "minutes")
 
-    # print("Plotting results and traces")
-    # plt.clf()
-    # if run_MH:
-    #     for j in range(nsteps[1]*niter - 1):
-    #             x = np.arange(j*nsteps[1], (j+1)*nsteps[1])
-    #             plt.plot(x, lnprobs[j*nsteps[1]: (j+1)*nsteps[1]])
-    # else:
-    #     plt.plot(sampler.lnprobability.T)
-    # plt.xlabel("Time")
-    # plt.ylabel("ln (probability)")
-    # plt.savefig(os.path.join(RESULTS_DIR, "prob_trace"))
+    print("Plotting results and traces")
+    plt.clf()
+    if run_MH:
+        print(len(lnprobs)/nsteps[0] - nsteps[0])
+        for j in range(len(lnprobs)/nsteps[0] - nsteps[0]):
+            x = np.arange(j*nsteps[0], (j+1)*nsteps[0])
+            print(np.shape(lnprobs), "lnprobs", nsteps[0]*(niter-1-number))
+            print(len(x), "x", j)
+            print(len(lnprobs[j*nsteps[0]: (j+1)*nsteps[0]]), j)
+            print(j*nsteps[0], (j+1)*nsteps[0])
+            plt.plot(x, lnprobs[j*nsteps[0]: (j+1)*nsteps[0]])
+    else:
+        plt.plot(sampler.lnprobability.T)
+    plt.xlabel("Time")
+    plt.ylabel("ln (probability)")
+    plt.savefig(os.path.join(RESULTS_DIR, "prob_trace"))
 
     labels = ["$a$", "$b$", "$n$", "$\ln(Mass_1)$", "$\ln(Mass_2)$",
               "$\ln(Mass_3)$", "$\ln(Age_{1,i})$", "$\ln(Age_{2,i})$",
