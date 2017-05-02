@@ -105,9 +105,9 @@ def lnprior(params, *args):
         age_prior = np.log(priors.age_prior(np.log10(1e9*np.exp(params[1]))))
         feh_prior = np.log(priors.feh_prior(params[2]))
         distance_prior = np.log(priors.distance_prior(np.exp(params[3])))
+        mAv = (0 <= params[4]) * (params[4] < 1)  # Prior on A_v
 
     m = (-20 < params) * (params < 20)  # Broad bounds on all params.
-    mAv = (0 <= params[4]) * (params[4] < 1)  # Prior on A_v
 
     if sum(m) == len(m) and mAv:
         return g_prior + age_prior + feh_prior + distance_prior
@@ -198,7 +198,7 @@ def MH_step(par, lnprob, t, *args, emc=False):
     return par, new_lnprob, accept
 
 
-def gibbs_control(par, lnprob, nsteps_list, niter, t, par_inds_list, args):
+def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
     """
     This function tells the metropolis hastings what parameters to sample in.
     params:
@@ -232,7 +232,7 @@ def gibbs_control(par, lnprob, nsteps_list, niter, t, par_inds_list, args):
     n_parameter_sets = len(par_inds_list)
 
     # Final sample array
-    all_samples = np.zeros((sum(nsteps_list) * niter, ndim + nstars))
+    all_samples = np.zeros((nsteps * niter, ndim + nstars))
 
     # Iterate over niter cycles of parameter sets.
     probs = []
@@ -240,8 +240,6 @@ def gibbs_control(par, lnprob, nsteps_list, niter, t, par_inds_list, args):
         print("Gibbs iteration ", i, "of ", niter)
         print(par)
         for k in range(len(par_inds_list)):  # loop over parameter sets.
-            nsteps = nsteps_list[k]
-            print(nsteps, "steps", "parameter_indices = ", par_inds_list[k])
             args[-1] = par_inds_list[k]
             samples, par, pb = MH(par, lnprob, nsteps, t[k],
                                                    *args)
@@ -296,8 +294,8 @@ if __name__ == "__main__":
     start = time.time()  # timeit
 
     # Different nsteps for different parameters. gyro, star 1, 2, 3.
-    nsteps = [1000, 1000, 1000, 1000]
-    niter = 4
+    nsteps = 10000
+    niter = 10
     N = len(mods)
 
     # Construct parameter indices for the different parameter sets.
@@ -318,19 +316,14 @@ if __name__ == "__main__":
 
     # Sample posteriors using either MH gibbs or emcee
     if run_MH:
-        # args = [[mods[0]], np.array([d.period.values[0]]),
-        #         np.array([d.period_err.values[0]]),
-        #         np.array([d.bv.values[0]]), np.array([d.bv_err.values[0]]),
-        #         np.array(par_inds_list[1])]
         args = [mods, d.period.values, d.period_err.values, d.bv.values,
                 d.bv_err.values, par_inds_list]
         flat, lnprobs = gibbs_control(params, lnprob, nsteps, niter, ts,
                                     par_inds_list, args)
 
         # Throw away _number_ Gibbs iterations as burn in. FIXME
-        number = 1
-        burnin = nsteps[0] * number
-        # burnin = nsteps * number * 2
+        number = 2
+        burnin = nsteps * number
         flat = flat[burnin:, :]
 
     else:
@@ -358,14 +351,9 @@ if __name__ == "__main__":
     print("Plotting results and traces")
     plt.clf()
     if run_MH:
-        print(len(lnprobs)/nsteps[0] - nsteps[0])
-        for j in range(len(lnprobs)/nsteps[0] - nsteps[0]):
-            x = np.arange(j*nsteps[0], (j+1)*nsteps[0])
-            print(np.shape(lnprobs), "lnprobs", nsteps[0]*(niter-1-number))
-            print(len(x), "x", j)
-            print(len(lnprobs[j*nsteps[0]: (j+1)*nsteps[0]]), j)
-            print(j*nsteps[0], (j+1)*nsteps[0])
-            plt.plot(x, lnprobs[j*nsteps[0]: (j+1)*nsteps[0]])
+        for j in range(int(len(lnprobs)/nsteps - 1)):
+            x = np.arange(j*nsteps, (j+1)*nsteps)
+            plt.plot(x, lnprobs[j*nsteps: (j+1)*nsteps])
     else:
         plt.plot(sampler.lnprobability.T)
     plt.xlabel("Time")
@@ -392,9 +380,9 @@ if __name__ == "__main__":
     for i in range(ndim):
         plt.clf()
         if run_MH:
-            for j in range(niter):
-                x = np.arange(j*nsteps[1], (j+1)*nsteps[1])  # FIXME
-                plt.plot(x, flat[j*nsteps[1]: (j+1)*nsteps[1], i].T)
+            for j in range(niter - number):
+                x = np.arange(j*nsteps, (j+1)*nsteps)
+                plt.plot(x, flat[j*nsteps: (j+1)*nsteps, i].T)
                 plt.ylabel(labels[i])
         else:
             plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
@@ -405,7 +393,5 @@ if __name__ == "__main__":
               np.log(2.5), np.log(2.5), 0., None, None, np.log(10),
               np.log(2400), np.log(2400), 0., None, None, np.log(4.56),
               np.log(2.5), np.log(2.5)]
-    flat = np.vstack((flat[:, 3], flat[:, 6], flat[:, 9], flat[:, 12],
-                      flat[:, 15])).T  # FIXME
     fig = corner.corner(flat, truths=truths, labels=labels)
     fig.savefig(os.path.join(RESULTS_DIR, "demo_corner_gibbs"))
