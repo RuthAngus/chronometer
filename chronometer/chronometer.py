@@ -33,22 +33,20 @@ plt.rcParams.update(plotpar)
 def lnlike(params, *args):
     """
     Probability of age and model parameters given rotation period and colour.
-    parameters:
     Parameters to pass to the models are selected using the par_inds list in
     *args.
-    Whether an "all parameter", "gyro parameter only" or "single star
-    isochrone parameters only" gibbs step is determined according to the what
-    the elements of par_inds look like.
-    This is probably a bad idea.
+    Whether a 'gyro parameter only' or 'single star isochrone parameters only'
+    gibbs step is determined according to the elements of par_inds.
     ----------
     params: (array)
-        The array of log parameters: a, b, n, age.
+        The array of log parameters: a, b, n, masses, ages, etc.
     args = mods, periods, period_errs, bvs, bv_errs, par_inds
-    par_inds: (array)
-        The parameters to vary.
+    mods: (list)
+        A list of starmodel objects, one for each star.
+    par_inds: (array) args[-1]
+        The indices of the parameters to vary.
     """
     mods, period, period_errs, bv, bv_errs, par_inds = args
-    N = len(period)
     gyro_lnlike, iso_lnlike = 0, 0
     if par_inds[0] == 0 and par_inds[1] == 1 and par_inds[2] == 2: # if gyro.
         gyro_lnlike = sum(-.5*((period - gyro_model(params, bv))
@@ -168,7 +166,7 @@ def MH(par, lnprob, nsteps, t, *args):
 
 def MH_step(par, lnprob, t, *args, emc=False):
     """
-    A single Metropolis Hastings step.
+    A single Metropolis step.
     if emc = True, the step is an emcee step instead.
     emcee is run for 10 steps with 64 walkers and the final position is taken
     as the step.
@@ -238,7 +236,7 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
     probs = []
     for i in range(niter):  # Loop over Gibbs repeats.
         print("Gibbs iteration ", i, "of ", niter)
-        print(par)
+        print("Current parameter values = ", par)
         for k in range(len(par_inds_list)):  # loop over parameter sets.
             args[-1] = par_inds_list[k]
             samples, par, pb = MH(par, lnprob, nsteps, t[k],
