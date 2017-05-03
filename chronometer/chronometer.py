@@ -198,7 +198,10 @@ def MH_step(par, lnprob, t, *args, emc=False):
 
 def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
     """
-    This function tells the metropolis hastings what parameters to sample in.
+    This function tells the metropolis hastings what parameters to sample in
+    and assembles the samples into an array. Because the ages are sampled
+    twice, the gyro age parameters are tacked onto the end of this array.
+    I'm not actually sure if this is the correct thing to do...
     params:
     ------
     par: (list)
