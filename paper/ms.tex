@@ -9,6 +9,7 @@
 \usepackage{bm}
 \usepackage{enumerate}
 \usepackage{pdflscape}
+\usepackage{eqnarray}
 
 \newcommand{\racomment}[1]{{\color{red}#1}}
 
@@ -51,6 +52,8 @@
 \newcommand{\teff}{$T_{\mathrm{eff}}$}
 \newcommand{\FeH}{[Fe/H]}
 \newcommand{\feh}{[Fe/H]}
+\newcommand{\Av}{$A_v$}
+\newcommand{\av}{$A_v$}
 \newcommand{\logg}{log \emph{g}}
 \newcommand{\dnu}{$\Delta \nu$}
 \newcommand{\numax}{$\nu_{\mathrm{max}}$}
@@ -94,7 +97,7 @@ Competing dating methods with different observational inputs often produce
 In this work we attempt to combine multiple methods into one coherent model.
 For the first time, we combine apparent magnitudes and colour information,
     typically used to infer an age using stellar evolutionary tracks, with
-    other age proxies: rotation period and galactic kinematics.
+    other age proxies: rotation period and vertical action.
 We identify a sample of stars with rotation periods, colours, spectroscopic
     parameters and kinematics to calibrate this dating method.
 % Results
@@ -323,8 +326,73 @@ radial velocities, providing vertical actions calculated from the full
 \section{Method}
 \label{sec:method}
 
-We combine the following dating methods: rotation, stellar evolution models
-and kinematics into one model via self calibration.
+We combine the following dating methods: gyrochronology, isochrone fitting,
+asteroseismology and galactic kinematics into one model.
+In classical isochrone fitting, one might calculate the probability of age
+($A$), mass ($M$), \feh, distance ($D$) and extinction (\av), given a set of
+apparent magnitudes in different filters, \eg\ $M_V$, $M_J$ and $M_K$
+\begin{equation}
+    p(A, M, [Fe/H], D, A_v | M_V, M_J, M_K) \propto p(M_v, M_J, M_K |
+    A, M, [Fe/H], D, A_v)p(A, M, [Fe/H], D, A_v).
+\end{equation}
+Note that there are no free parameters in the model here --- the model is
+entirely governed by physics and does not need to be calibrated further.
+Similarly, in classical gyrochronology, one might calculate the probability of
+age given rotation period and $B-V$ colour,
+\begin{equation}
+    p(A | P_{rot}, B-V) \propto p(P_{rot}, B-V | A)p(A)
+\end{equation}
+In a gyrochronology model, because our understanding of the physics is
+incomplete, there are some free parameters that must be calibrated.
+In the \citet{Barnes2003} gyrochronology parameterisation, these are $a$, $b$
+and $n$, $A = P^{1/n} - (B-V-0.4)^{b/n}$.
+During a calibration exercise, the observables, $A$, $P_{rot}$ and $B-V$ will
+be known and the parameters, $a$, $b$ and $n$ will be inferred,
+\begin{equation}
+    p(a, b, n | A, P_{rot}, B-V) \propto p(A, P_{rot}, B-V | a,
+    b, n) p(a, b, n).
+\end{equation}
+The vertical action-age relation also has free parameters that must be
+calibrated using observations, $A = \alpha (\sigma_{Jz}^2)^\beta$.
+These free parameters, $\alpha$ and $\beta$ can, again be calibrated via
+\begin{equation}
+    p(\alpha, \beta | \{A\}, \{J_z\}) \propto p(\{A\}, \{J_z\} | \alpha,
+    \beta) p(\alpha, \beta).
+\end{equation}
+
+The unique aspect of our analysis is to combine inference over ages with
+calibration of the free parameters in the gyrochronology and vertical
+action-age relations:
+\begin{eqnarray}
+    &&p(\{A\}, \{M\}, \{[Fe/H]\}, \{D\}, \{A_v\}, a, b, n, \alpha, \beta|
+    \{M_V\}, \{M_J\}, \{M_K\}, \{P_{rot}\}, \{B-V\}, \{J_z\}) \\
+    \propto &&p(\{M_v\}, \{M_J\}, \{M_K\}, \{P_{rot}\},
+    \{B-V\}, \{J_z\} | \{A\}, \{M\}, \{[Fe/H]\}, \{D\}, \{A_v\}, a, b, n,
+    \alpha, \beta) \\
+    &&p(A, M, [Fe/H], D, A_v, a, b, n, \alpha, \beta).
+\end{eqnarray}
+We can use conditional independence to break this down further into the
+following:
+\begin{eqnarray}
+    &&p(\{A\}, \{M\}, \{[Fe/H]\}, \{D\}, \{A_v\}, a, b, n, \alpha, \beta|
+    M_V, M_J, M_K,
+    \{P_{rot}\}, \{B-V\}, \{J_z\}) \\
+    \propto &&p(\{M_v\}, \{M_J\}, \{M_K\} | \{A\}, \{M\}, \{[Fe/H]\}, \{D\},
+    \{A_v\})
+    p(A)p(M)p([Fe/H])p(D)p(A_v) \\
+    &&p(\{P_{rot}\}, \{B-V\}, a, b, n | A)p(a)p(b)p(n) \\
+    &&p(\{J_z\}, \alpha, \beta | \{A\}) p(\alpha)p(\beta).
+\end{eqnarray}
+In other words
+\begin{eqnarray}
+    &&p(\mathrm{Ages~\&~other~parameters}|\mathrm{observables}) \\
+    \propto &&\mathcal{L}_{\mathrm{isochronal~age}} \times
+    \mathcal{L}_{\mathrm{gyro~age}} \times
+    \mathcal{L}_{\mathrm{kinematic~age}} \\
+    && \times p(\mathrm{Ages~\&~other~parameters})
+\end{eqnarray}.
+
+
 As an example, take the Sun: a star with temperature $5777K$, $ \log(g) =
 4.44$ $[Fe/H] = 0.0$ and $P_{rot} = 26$ days.
 
@@ -350,7 +418,7 @@ Support for MAST for non-HST data is provided by the NASA Office of Space
 Science via grant NNX09AF08G and by other grants and contracts.
 This paper includes data collected by the Kepler mission. Funding for the
 Kepler mission is provided by the NASA Science Mission directorate.
-\racomment{Add TGAS \& Apogee acknowledgements.}
+\racomment{Add Gaia sprint, TGAS \& Apogee acknowledgements.}
 
 \bibliographystyle{plainnat}
 \bibliography{chronometer}
