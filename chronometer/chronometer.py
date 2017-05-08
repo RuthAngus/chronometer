@@ -49,8 +49,10 @@ def lnlike(params, *args):
     mods, period, period_errs, bv, bv_errs, par_inds = args
     gyro_lnlike, iso_lnlike = 0, 0
     if par_inds[0] == 0 and par_inds[1] == 1 and par_inds[2] == 2: # if gyro.
-        gyro_lnlike = sum(-.5*((period - gyro_model(params, bv))
-                                /period_errs)**2)
+        r = np.isfinite(period)
+        r_period, r_period_errs, r_bv = period[r], period_errs[r], bv[r]
+        gyro_lnlike = sum(-.5*((r_period - gyro_model(params, r_bv))
+                                /r_period_errs)**2)
 
     # If not gyro but single stars
     else:
@@ -286,7 +288,7 @@ if __name__ == "__main__":
 
     # Load the data for the initial parameter array.
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
-    d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
+    d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv")
 
     # Generate the initial parameter array and the mods objects from the data.
     params, mods = pars_and_mods(DATA_DIR)
@@ -295,7 +297,7 @@ if __name__ == "__main__":
     start = time.time()  # timeit
 
     # Different nsteps for different parameters. gyro, star 1, 2, 3.
-    nsteps = 10000
+    nsteps = 1000
     niter = 10
     N = len(mods)
 
@@ -396,3 +398,8 @@ if __name__ == "__main__":
               np.log(2.5), np.log(2.5)]
     fig = corner.corner(flat, truths=truths, labels=labels)
     fig.savefig(os.path.join(RESULTS_DIR, "demo_corner_gibbs"))
+
+    f = h5py.File(os.path.join(RESULTS_DIR, "samples.h5"), "w")
+    data = f.create_dataset("samples", np.shape(flat))
+    data[:, :] = flat
+    f.close()
