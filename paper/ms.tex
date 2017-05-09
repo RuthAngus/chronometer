@@ -329,32 +329,35 @@ radial velocities, providing vertical actions calculated from the full
 We combine the following dating methods: gyrochronology, isochrone fitting,
 asteroseismology and galactic kinematics into one model.
 In classical isochrone fitting, one might calculate the probability of age
-($A$), mass ($M$), \feh, distance ($D$) and extinction (\av), given a set of
-apparent magnitudes in different filters, \eg\ $M_V$, $M_J$ and $M_K$
-\begin{equation}
-    p(A, M, [Fe/H], D, A_v | M_V, M_J, M_K) \propto p(M_v, M_J, M_K |
-    A, M, [Fe/H], D, A_v)p(A, M, [Fe/H], D, A_v).
-\end{equation}
-Note that there are no free parameters in the model here --- the model is
-entirely governed by physics and does not need to be calibrated further.
+$A$, mass $M$, \feh, distance $D$ and extinction \av, given a set of
+apparent magnitudes in different filters, \eg\ $M_V$, $M_J$ and $M_K$.
+This can be written
+\begin{eqnarray}
+    &&p(A, M, [Fe/H], D, A_v | M_V, M_J, M_K) \\ \nonumber
+    \propto &&p(M_v, M_J, M_K | A, M, [Fe/H], D, A_v) \\ \nonumber
+    &&p(A)p(M)p([Fe/H])p(D)p(A_v).
+\end{eqnarray}
+There are no free parameters in the model here --- the model is entirely
+determined by physics and does not need to be calibrated further.
 Similarly, in classical gyrochronology, one might calculate the probability of
 age given rotation period and $B-V$ colour,
 \begin{equation}
     p(A | P_{rot}, B-V) \propto p(P_{rot}, B-V | A)p(A)
 \end{equation}
-In a gyrochronology model, because our understanding of the physics is
-incomplete, there are some free parameters that must be calibrated.
-In the \citet{Barnes2003} gyrochronology parameterisation, these are $a$, $b$
-and $n$, $A = P^{1/n} - (B-V-0.4)^{b/n}$.
+In a gyrochronology model however our understanding of the physics is
+incomplete and some free parameters must be calibrated.
+In the \citet{Barnes2003} gyrochronology parameterisation, $A =
+P_{\mathrm{rot}}^{1/n} - (B-V-0.4)^{b/n}$, these free parameters are $a$, $b$
+and $n$.
 During a calibration exercise, the observables, $A$, $P_{rot}$ and $B-V$ will
 be known and the parameters, $a$, $b$ and $n$ will be inferred,
 \begin{equation}
-    p(a, b, n | A, P_{rot}, B-V) \propto p(A, P_{rot}, B-V | a,
-    b, n) p(a, b, n).
+    p(a, b, n | \{A\}, \{P_{rot}\}, \{B-V\}) \propto \{p(A\}, \{P_{rot}\},
+    \{B-V\} | a, b, n) p(a)p(b)p(n).
 \end{equation}
-The vertical action-age relation also has free parameters that must be
-calibrated using observations, $A = \alpha (\sigma_{Jz}^2)^\beta$.
-These free parameters, $\alpha$ and $\beta$ can, again be calibrated via
+The vertical action-age relation, $A = \alpha (\sigma_{Jz}^2)^\beta$,
+also has free parameters that must be calibrated using observations.
+These free parameters, $\alpha$ and $\beta$ can again be calibrated via
 \begin{equation}
     p(\alpha, \beta | \{A\}, \{J_z\}) \propto p(\{A\}, \{J_z\} | \alpha,
     \beta) p(\alpha, \beta).
@@ -365,10 +368,10 @@ calibration of the free parameters in the gyrochronology and vertical
 action-age relations:
 \begin{eqnarray}
     &&p(\{A\}, \{M\}, \{[Fe/H]\}, \{D\}, \{A_v\}, a, b, n, \alpha, \beta|
-    \{M_V\}, \{M_J\}, \{M_K\}, \{P_{rot}\}, \{B-V\}, \{J_z\}) \\
+    \{M_V\}, \{M_J\}, \{M_K\}, \{P_{rot}\}, \{B-V\}, \{J_z\}) \\ \nonumber
     \propto &&p(\{M_v\}, \{M_J\}, \{M_K\}, \{P_{rot}\},
     \{B-V\}, \{J_z\} | \{A\}, \{M\}, \{[Fe/H]\}, \{D\}, \{A_v\}, a, b, n,
-    \alpha, \beta) \\
+    \alpha, \beta) \\ \nonumber
     &&p(A, M, [Fe/H], D, A_v, a, b, n, \alpha, \beta).
 \end{eqnarray}
 We can use conditional independence to break this down further into the
@@ -376,11 +379,11 @@ following:
 \begin{eqnarray}
     &&p(\{A\}, \{M\}, \{[Fe/H]\}, \{D\}, \{A_v\}, a, b, n, \alpha, \beta|
     M_V, M_J, M_K,
-    \{P_{rot}\}, \{B-V\}, \{J_z\}) \\
+    \{P_{rot}\}, \{B-V\}, \{J_z\}) \\  \nonumber
     \propto &&p(\{M_v\}, \{M_J\}, \{M_K\} | \{A\}, \{M\}, \{[Fe/H]\}, \{D\},
     \{A_v\})
-    p(A)p(M)p([Fe/H])p(D)p(A_v) \\
-    &&p(\{P_{rot}\}, \{B-V\}, a, b, n | A)p(a)p(b)p(n) \\
+    p(A)p(M)p([Fe/H])p(D)p(A_v) \\ \nonumber
+    &&p(\{P_{rot}\}, \{B-V\}, a, b, n | A)p(a)p(b)p(n) \\ \nonumber
     &&p(\{J_z\}, \alpha, \beta | \{A\}) p(\alpha)p(\beta).
 \end{eqnarray}
 In other words
@@ -391,7 +394,27 @@ In other words
     \mathcal{L}_{\mathrm{kinematic~age}} \\
     && \times p(\mathrm{Ages~\&~other~parameters})
 \end{eqnarray}.
+We can multiply the likelihoods together by making the assumption that the
+probabilities are conditionally independent, \ie\ a gyrochronology age depends
+only on rotation period and colour, not proper motion, for example.
+In reality this assumption is not valid because gyrochronology ages do depend
+on \logg, \teff\ and \feh.
+\racomment{How do we get around this!?}
 
+We explore the parameter space via Gibbs sampling.
+Gibbs sampling is a variation of MCMC that makes use of conditional
+independence within the problem to reduce dimensionality.
+It is often used in hierarchical inference problems such as this, where one
+has a set of global parameters ($a$, $b$, $n$, $\alpha$ \& $\beta$) and sets
+of per-object parameters ($\{A\}$, $\{M\}$, $\{[Fe/H]\}$, $\{D\}$, $\{A_v\}$).
+Instead of updating all parameters simultaneously as in Metropolis,
+Metropolis-Hastings, affine invariant \citep{Goodman2010}, nested, Hamiltonian,
+and many other sampling algorithms, in Gibbs sampling, subsets of parameters
+are updated.
+For example, the gyrochronology parameters will be updated, then the kinematic
+parameters, then the isochronal parameters for star 1, then star 2, etc.
+Since the number of parameters is $N_{gyro} + N_{kinematic} + N_{iso} \times
+N_{stars}$, the number of parameters grows rapidly as stars are added.
 
 As an example, take the Sun: a star with temperature $5777K$, $ \log(g) =
 4.44$ $[Fe/H] = 0.0$ and $P_{rot} = 26$ days.
