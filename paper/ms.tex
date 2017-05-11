@@ -270,6 +270,30 @@ Leading to etc, etc.
 
 \subsection{Galactic Dynamics}
 
+The age-velocity dispersion relations are relatively well studied and based on
+simple physics.
+There is evidence to suggest that stars in the Milky Way form in the thin disc
+of the galaxy with relatively small vertical velocities and angular momenta
+\racomment{add citations}.
+As time passes these stars are scattered via close encounters with other
+stars and interactions with galactic spiral arms.
+The more time passes, the more scattering events, and stars slowly accumulate
+angular momentum in the vertical direction, known as vertical action.
+This results in a slow heating of stellar orbits.
+Older stars can be identified in Gaia DR1 by integrating their orbits in the
+potential of the Milky Way to convert their proper motions, positions and
+parallaxes into vertical actions.
+It is the {\it dispersion} in vertical action that truly traces age, far
+better than vertical action itself.
+However for single stars only the individual's vertical action is available.
+Nonetheless, $J_z^2$ increases over time for any given star, and is a weak
+tracer of age.
+When studying populations of stars, the vertical action dispersion can be used
+to infer their age relatively precisely (to within 2 Gyr
+\racomment{Ruth, check this}).
+However for single stars vertical action can only constrain ages to within 4
+Gyr.
+
 This paper is laid out as follows.
 % In \textsection \ref{sec:dating_methods} we provide an overview of each dating
 % method used in this paper and demonstrate their inconsistency in age
@@ -325,6 +349,70 @@ radial velocities, providing vertical actions calculated from the full
 
 \section{Method}
 \label{sec:method}
+
+{\tt chronometer} extends isochrone fitting by simultaneously fitting an
+age-rotation relation and a age-velocity dispersion relation to stars with
+photometric colors, rotation periods and Gaia proper motions.
+It combines the information available from these three dating techniques, thus
+providing more accurate ages than any one of the techniques alone.
+
+The accuracy of ages calculated with {\tt chronometer} still relies on the
+rotational and kinematic age relations being correct.
+As discussed above, the performance of the age-rotation relations for old
+stars has been called into question in the last few years \citep{Angus2015,
+Vansaders2016, Metcalfe2016}.
+A simple straight-line model for rotational age does not reproduce the ages
+predicted by asteroseismology for stars older than the Sun.
+This phenomenon is attributed to a transitioning magnetic dynamo at a critical
+Rossby number, $Ro$, of 2.6, the solar value \citep{Vansaders2016}.
+As rotation periods slow, $Ro$ decreases until it hits the critical value and
+magnetic braking switches off: stars maintain their rotation period from that
+point onward.
+This restricts the applicability of gyrochronology to young, rapidly rotating
+stars.
+This hypothesis is supported by the existing data, however these data are
+sparse~---~the analyses demonstrating the discrepancies were conducted on the
+small number of main sequence, Solar-like oscillators observed by Kepler in
+short cadence mode with detectable rotation periods: a sample size of around
+20 \racomment{Ruth - check this number}.
+% Furthermore, asteroseismology favors stars with low surface gravities since
+% they show the largest amplitudes of oscillation and the majority of stars in
+% this sample were slightly evolved.
+A larger sample of old main sequence stars with precise ages is required to
+confirm and further characterize the Rossby saturation mechanism introduced by
+\citep{Vansaders2016} which is currently supported by the Kepler data.
+However, old main sequence stars are difficult to age-date with any other
+method than asteroseismology.
+We propose use the age gradients in the kinematic properties of stars to
+confirm the Rossby saturation effect.
+
+A simple test will allow us to distinguish between two magnetic braking
+scenarios in MS stars: the continuous scenario in which stars begin magnetic
+braking at zero-age main sequence and continue until main sequence turn off,
+and the transition scenario in which stars stop braking at a critical Rossby
+number.
+This test involves computing rotation-based ages for stars observed by both
+Kepler and Gaia.
+Each star will have ages computed using the continuous scenario and the
+transition scenario.
+The vertical action dispersion will then be calculated for groups of stars
+with similar rotational age, producing two vertical action-age relations.
+The vertical action dispersion will also be calculated for red giants observed
+by APOGEE with ages from the Cannon \citep{Ness2015}, observed by Gaia.
+This red giant vertical action-age relation will serve as our "ground truth"
+since these ages are relatively robust and well calibrated with asteroseismic
+giants.
+We will compare the both the $\sigma_{J_z}$-age relation for the continuous
+scenario and the $\sigma_{J_z}$-age relation for the transition scenario with
+the red giant $\sigma_{J_z}$-age relation.
+This test will reveal whether continuous magnetic braking or transitional
+magnetic braking provides a better description of the data.
+
+This test will allow us to select an appropriate age rotation relation to be
+used in {\tt chronometer}, our new age-dating method for MS stars.
+{\tt chronometer} combines the following dating methods: gyrochronology,
+isochrone fitting, asteroseismology and galactic kinematics into one model by
+simply summing the log-likelihoods of the three different models.
 
 We combine the following dating methods: gyrochronology, isochrone fitting,
 asteroseismology and galactic kinematics into one model.
@@ -410,7 +498,7 @@ of per-object parameters ($\{A\}$, $\{M\}$, $\{[Fe/H]\}$, $\{D\}$, $\{A_v\}$).
 Instead of updating all parameters simultaneously as in Metropolis,
 Metropolis-Hastings, affine invariant \citep{Goodman2010}, nested, Hamiltonian,
 and many other sampling algorithms, in Gibbs sampling, subsets of parameters
-are updated.
+are updated at a time.
 For example, the gyrochronology parameters will be updated, then the kinematic
 parameters, then the isochronal parameters for star 1, then star 2, etc.
 Since the number of parameters is $N_{gyro} + N_{kinematic} + N_{iso} \times
