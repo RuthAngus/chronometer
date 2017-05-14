@@ -96,7 +96,7 @@ def transform_parameters(lnparams, indicator, all_params):
         return p, N
 
 
-def pars_and_mods(DATA_DIR):
+def pars_and_mods(d):
     """
     Create the initial parameter array and the mod objects needed for
     isochrones.py from the data file provided.
@@ -109,7 +109,6 @@ def pars_and_mods(DATA_DIR):
     """
     # The initial parameters
     gc = np.array([.7725, .601, .5189])
-    d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv"))
 
     d = replace_nans_with_inits(d)
     p0 = np.concatenate((gc, np.log(d.mass.values),

@@ -260,13 +260,32 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
     return all_samples, lnprobs
 
 
-def estimate_covariance():
+# def estimate_covariance():
+def estimate_covariance(nstars):
     """
     Return the covariance matrix of the emcee samples.
+    If there are more stars than the three that were used to construct this
+    matrix, repeat the last five columns and rows nstar times.
     """
     with h5py.File("emcee_posterior_samples.h5", "r") as f:
         samples = f["samples"][...]
-    return np.cov(samples, rowvar=False)
+    cov = np.cov(samples, rowvar=False)
+    # return cov
+    print(np.shape(cov))
+    n = (np.shape(cov)[0] - 3)/5
+    print(n)
+    nadd = nstars - n
+    print(nadd)
+    star_cov_column = cov[:, -5:]
+    print(np.shape(star_cov_column))
+    for i in range(nadd):
+        newcov = np.vstack((cov, star_cov_column))
+        print(np.shape(newcov))
+        newcov = np.hstack((cov, star_cov_column.T))
+        print(np.shape(newcov))
+    print(np.shape(newcov))
+    assert 0
+    return newcov
 
 
 def find_optimum():
@@ -288,10 +307,11 @@ if __name__ == "__main__":
 
     # Load the data for the initial parameter array.
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
-    d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv")
+    # d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv")
+    d = pd.read_csv(os.path.join(DATA_DIR, "data.csv"))
 
     # Generate the initial parameter array and the mods objects from the data.
-    params, mods = pars_and_mods(DATA_DIR)
+    params, mods = pars_and_mods(d)
     # params = find_optimum()
 
     start = time.time()  # timeit
@@ -309,7 +329,9 @@ if __name__ == "__main__":
         par_inds_list.append(par_inds[3+i::N])  # Iso stars.
 
     # Create the covariance matrices.
-    t = estimate_covariance()
+    print(len(mods), "len mods")
+    assert 0
+    t = estimate_covariance(N)
     ts = []
     for i, par_ind in enumerate(par_inds_list):
         ti = np.zeros((len(par_ind), len(par_ind)))
