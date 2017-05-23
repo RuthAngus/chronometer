@@ -62,6 +62,7 @@ if __name__ == "__main__":
     plt.plot(ages, dispersions)
     plt.xlabel("log(Time)")
     plt.ylabel("dispersion")
+    plt.subplots_adjust(bottom=.15)
     plt.savefig("age_dispersion")
 
     assert 0

@@ -309,6 +309,8 @@ if __name__ == "__main__":
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
     # d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv")
     d = pd.read_csv(os.path.join(DATA_DIR, "data.csv"))
+    print(d.keys())
+    assert 0
 
     # Generate the initial parameter array and the mods objects from the data.
     params, mods = pars_and_mods(d)

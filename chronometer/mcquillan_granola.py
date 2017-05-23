@@ -58,7 +58,16 @@ if __name__ == "__main__":
     m = (d.age.values > 0) * (d.age.values < 14)
     df = d.iloc[m]
 
-    ages, dispersions, Ns = calc_dispersion(df.age.values, df.Jz.values, 8)
+    plt.clf()
+    plt.plot(np.log(df.Jz.values**2), np.log(df.age.values), "k.")
+    xs = np.linspace(min(df.Jz.values), max(df.Jz.values), 100)
+    ys = .2*xs - (.9/.2)
+    # plt.plot(xs, ys)
+    plt.ylabel("Age")
+    plt.xlabel("Jz2")
+    plt.savefig("age_vs_Jz2")
+
+    ages, dispersions, Ns = calc_bin_dispersion(df.age.values, df.Jz.values, 8)
     d_err = dispersions / (2 * Ns - 2)**.5
 
     plt.clf()
@@ -70,7 +79,7 @@ if __name__ == "__main__":
     plt.savefig("linear_age_dispersion.pdf")
 
     m = np.log(df.age.values) > - 1
-    lnages, dispersions, Ns = calc_dispersion(np.log(df.age.values[m]),
+    lnages, dispersions, Ns = calc_bin_dispersion(np.log(df.age.values[m]),
                                       df.Jz.values[m], 8)
     d_err = dispersions / (2 * Ns - 2)**.5
 
@@ -81,6 +90,9 @@ if __name__ == "__main__":
     plt.xlabel("$\ln(\mathrm{Age,~Gyr})$")
     plt.ylabel("$\sigma J_z~(\mathrm{Kpc~kms}^{-1})$")
     plt.xlim(-1, 2.6)
+    xs = np.linspace(min(lnages), max(lnages), 100)
+    ys = .2*xs + .9
+    plt.plot(xs, ys)
     plt.savefig("log_age_dispersion.pdf")
 
     m = np.log(df.age.values) > - 1

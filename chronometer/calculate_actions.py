@@ -5,7 +5,7 @@ Append Jz to a csv file.
 
 import numpy as np
 import pandas as pd
-from actions import calc_actions
+from actions import action
 import os
 
 
@@ -56,31 +56,37 @@ def convert_coords_to_actions(df):
           np.shape(pm_ra_masyr), np.shape(pm_dec_masyr), np.shape(v_los_kms))
     print(ra_deg[0], dec_deg[0], d_kpc[0], pm_ra_masyr[0], pm_dec_masyr[0],
           v_los_kms[0])
-    jr, lz, jz = calc_actions(ra_deg[0], dec_deg[0], d_kpc[0], pm_ra_masyr[0],
-                              pm_dec_masyr[0], v_los_kms[0])
+    R_kpc, phi_rad, z_kpc, vR_kms, vT_kms, vz_kms, jr, lz, jz = \
+        [np.zeros(len(ra_deg)) for i in range(9)]
     jr_err, lz_err, jz_err = [np.zeros(len(jr)) for i in range(3)]
+    for i in range(len(ra_deg)):
+        R_kpc[i], phi_rad[i], z_kpc[i], vR_kms[i], vT_kms[i], vz_kms[i], \
+            jr[i], lz[i], jz[i] = action(ra_deg[i], dec_deg[i], d_kpc[i],
+                                         pm_ra_masyr[i], pm_dec_masyr[i],
+                                         v_los_kms[i])
     print(jz)
     assert 0
-    return jr, jr_err, lz, lz_err, jz, jz_err
+    return np.array([R_kpc, R_kpc_err, phi_rad, phi_rad_err, z_kpc, z_kpc_err,
+                     vR_kms, vR_kms_err, vT_kms, vT_kms_err, vz_kms,
+                     vz_kms_err, jr, jr_err, lz, lz_err, jz, jz_err])
 
 
-def save_pd_file(df, fn, jr, jr_err, lz, lz_err, jz, jz_err):
+def save_pd_file(df, fn, array):
     """
     Add the actions to the df and save it under a different name.
     """
-    df["Jr"] = jr
-    df["Jr_err"] = jr_err
-    df["Lz"] = lz
-    df["Lz_err"] = lz_err
-    df["Jz"] = jz
-    df["Jz_err"] = jz_err
+    df["R_kpc"], df["R_kpc_err"], df["phi_rad"], df["phi_rad_err"], \
+        df["z_kpc"], df["z_kpc_err"], df["vR_kms"], df["vR_kms_err"], \
+        df["vT_kms"], df["vT_kms_err"], df["vz_kms"], df["vz_kms_err"], \
+        df["Jr"], df["Jr_err"], df["Lz"], df["Lz_err"], df["Jz"], \
+        df["Jz_err"] = array
     df.to_csv(fn)
 
 
 if __name__ == "__main__":
     DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
     df = load_pd_file(os.path.join(DIR, "data.csv"))
-    jr, jr_err, lz, lz_err, jz, jz_err = convert_coords_to_actions(df)
-    print(jz)
+    action_array = convert_coords_to_actions(df)
+    print(action_array)
     assert 0
-    save_pd_file(df, os.path.join(DIR, "action_data.csv"), action_list)
+    save_pd_file(df, os.path.join(DIR, "action_data.csv"), action_array)

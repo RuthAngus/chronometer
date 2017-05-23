@@ -9,6 +9,9 @@ Make it easy to pull out the parameters of one star.
 Tidy.
 Use classes.
 
+
+
+
 Method:
 Add kinematics.
 Add van Saders rotation model.
@@ -16,3 +19,7 @@ Add binaries to rotation model.
 Add width to rotation model.
 Add asteroseismology.
 Add ability to use posteriors.
+Allow automatic detection of non-convective layer stars (high mass stars, M
+and brown dwarfs).
+Add the option of tying together the ages and metallicities of cluster and
+binary stars.

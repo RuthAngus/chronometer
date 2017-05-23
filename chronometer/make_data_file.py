@@ -19,7 +19,7 @@ def create_and_save_df(*args):
         dataframe.
     """
     frames = [i for i in args]
-    df = pd.concat(frames)
+    df = pd.concat(frames, axis=0, how="outer")
     df.to_csv(os.path.join(DATA_DIR, "data.csv"))
 
 
