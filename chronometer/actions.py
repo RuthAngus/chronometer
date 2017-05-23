@@ -123,13 +123,21 @@ def calc_actions(R_kpc, phi_rad, z_kpc, vR_kms, vT_kms, vz_kms):
     _REFR0 = 8.  # [kpc]  --> galpy length unit
     _REFV0 = 220.  # [km/s] --> galpy velocity unit
 
-    R = np.array([R_kpc, 8.1]) / _REFR0  # Galactocentric radius
-    vR = np.array([vR_kms, 0.]) / _REFV0  # radial velocity
-    phi = np.array([phi_rad, 0.])  # Galactocentric azimuth angle
+    # R = np.array([R_kpc, 8.1]) / _REFR0  # Galactocentric radius
+    # vR = np.array([vR_kms, 0.]) / _REFV0  # radial velocity
+    # phi = np.array([phi_rad, 0.])  # Galactocentric azimuth angle
+    # # (not needed for actions in axisymmetric potential)
+    # vT = np.array([vT_kms, 230.]) / _REFV0  # tangential velocity
+    # z = np.array([z_kpc, 0.1]) / _REFR0  # height above plane
+    # vz = np.array([vz_kms, 0.]) / _REFV0  # vertical velocity
+
+    R = R_kpc / _REFR0  # Galactocentric radius
+    vR = vR_kms / _REFV0  # radial velocity
+    phi = phi_rad  # Galactocentric azimuth angle
     # (not needed for actions in axisymmetric potential)
-    vT = np.array([vT_kms, 230.]) / _REFV0  # tangential velocity
-    z = np.array([z_kpc, 0.1]) / _REFR0  # height above plane
-    vz = np.array([vz_kms, 0.]) / _REFV0  # vertical velocity
+    vT = vT_kms / _REFV0  # tangential velocity
+    z = z_kpc / _REFR0  # height above plane
+    vz = vz_kms / _REFV0  # vertical velocity
 
     # delta = focal length of confocal coordinate system
     # Use C code (for speed)

@@ -58,17 +58,22 @@ def convert_coords_to_actions(df):
           v_los_kms[0])
     R_kpc, phi_rad, z_kpc, vR_kms, vT_kms, vz_kms, jr, lz, jz = \
         [np.zeros(len(ra_deg)) for i in range(9)]
-    jr_err, lz_err, jz_err = [np.zeros(len(jr)) for i in range(3)]
+    jr_err, lz_err, jz_err, R_kpc_err, phi_rad_err, z_kpc_err, vR_kms_err, \
+        vT_kms_err, vz_kms_err = [np.zeros(len(jr)) for i in range(9)]
     for i in range(len(ra_deg)):
         R_kpc[i], phi_rad[i], z_kpc[i], vR_kms[i], vT_kms[i], vz_kms[i], \
             jr[i], lz[i], jz[i] = action(ra_deg[i], dec_deg[i], d_kpc[i],
                                          pm_ra_masyr[i], pm_dec_masyr[i],
                                          v_los_kms[i])
-    print(jz)
-    assert 0
-    return np.array([R_kpc, R_kpc_err, phi_rad, phi_rad_err, z_kpc, z_kpc_err,
-                     vR_kms, vR_kms_err, vT_kms, vT_kms_err, vz_kms,
-                     vz_kms_err, jr, jr_err, lz, lz_err, jz, jz_err])
+    m = (ra_deg == 0.) * (dec_deg == 0.) * (pm_ra_masyr == 0.) * \
+        (pm_dec_masyr == 0.)
+    action_array = np.array([R_kpc, R_kpc_err, phi_rad, phi_rad_err, z_kpc,
+                             z_kpc_err, vR_kms, vR_kms_err, vT_kms,
+                             vT_kms_err, vz_kms, vz_kms_err, jr, jr_err, lz,
+                             lz_err, jz, jz_err])
+    for i, arr in enumerate(action_array):  # Mute non-values
+        action_array[i][m] = np.zeros(len(action_array[i][m]))
+    return action_array
 
 
 def save_pd_file(df, fn, array):
@@ -80,6 +85,7 @@ def save_pd_file(df, fn, array):
         df["vT_kms"], df["vT_kms_err"], df["vz_kms"], df["vz_kms_err"], \
         df["Jr"], df["Jr_err"], df["Lz"], df["Lz_err"], df["Jz"], \
         df["Jz_err"] = array
+    print(df["R_kpc"])
     df.to_csv(fn)
 
 
@@ -87,6 +93,4 @@ if __name__ == "__main__":
     DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
     df = load_pd_file(os.path.join(DIR, "data.csv"))
     action_array = convert_coords_to_actions(df)
-    print(action_array)
-    assert 0
     save_pd_file(df, os.path.join(DIR, "action_data.csv"), action_array)
