@@ -72,7 +72,7 @@ def convert_coords_to_actions(df):
                              vT_kms_err, vz_kms, vz_kms_err, jr, jr_err, lz,
                              lz_err, jz, jz_err])
     for i, arr in enumerate(action_array):  # Mute non-values
-        action_array[i][m] = np.zeros(len(action_array[i][m]))
+        action_array[i][m] = np.ones(len(action_array[i][m])) * np.nan
     return action_array
 
 
