@@ -308,27 +308,33 @@ if __name__ == "__main__":
     # Load the data for the initial parameter array.
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
     # d = pd.read_csv(os.path.join(DATA_DIR, "data_file.csv")
-    d = pd.read_csv(os.path.join(DATA_DIR, "data.csv"))
-    print(d.keys())
-    assert 0
+    d = pd.read_csv(os.path.join(DATA_DIR, "action_data.csv"))
 
-    # Generate the initial parameter array and the mods objects from the data.
-    params, mods = pars_and_mods(d)
+    # Generate the initial parameter array and the mods objects from the data
+    # The initial parameters
+    global_params = np.array([.7725, .601, .5189, 350.])  # a, b, n, beta
+
+    params, mods = pars_and_mods(d, global_params)
     # params = find_optimum()
 
     start = time.time()  # timeit
 
-    # Different nsteps for different parameters. gyro, star 1, 2, 3.
+    # Set nsteps and niter.
     nsteps = 1000
     niter = 10
-    N = len(mods)
+    N = len(mods)  # number of stars
+    nglob, nind = 4, 5  # number of global pars and number of per-star pars.
+    ngyro = 3  # number of gyro parameters.
 
     # Construct parameter indices for the different parameter sets.
     par_inds = np.arange(len(params))  # All
-    gyro_par_inds = np.concatenate((par_inds[:3], par_inds[3+N:3+2*N])) # Gyro
+    gyro_par_inds = np.concatenate((par_inds[:ngyro],
+                                    par_inds[nglob+N:nglob+2*N])) # Gyro pars
     par_inds_list = [gyro_par_inds]
     for i in range(N):
-        par_inds_list.append(par_inds[3+i::N])  # Iso stars.
+        par_inds_list.append(par_inds[nglob+i::N])  # Iso stars.
+    print(par_inds_list)
+    assert 0
 
     # Create the covariance matrices.
     print(len(mods), "len mods")
