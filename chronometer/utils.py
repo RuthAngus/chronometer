@@ -56,16 +56,18 @@ def make_param_dict(d, i):
     i: (int)
         The index of the star.
     """
-    param_dict = {"V": (d.v.values[i], d.v_err.values[i]),
-                  "Ks": (d.ks.values[i], d.ks_err.values[i]),
-                  "J": (d.j.values[i], d.j_err.values[i]),
+    param_dict = {"J": (d.j.values[i], d.j_err.values[i]),
                   "H": (d.h.values[i], d.h_err.values[i]),
                   "K": (d.k.values[i], d.k_err.values[i]),
+                  "G": (d.tgas_phot_g_mean_mag.values[i],
+                        d.tgas_phot_g_mean_flux_error.values[i]/
+                        d.tgas_phot_g_mean_flux.values[i] *
+                        d.tgas_phot_g_mean_mag.values[i]),
                   "Teff": (d.Teff.values[i], d.Teff_err.values[i]),
                   "logg": (d.logg.values[i], d.logg_err.values[i]),
                   "feh": (d.feh.values[i], d.feh_err.values[i]),
                   "parallax": (d.parallax.values[i],
-                               d.parallax_err.values[i])}
+                               d.parallax_err.values[i])}  # FIXME: add more filters
     return param_dict
 
 
@@ -94,7 +96,7 @@ def transform_parameters(lnparams, indicator, all_params):
         return p, N
 
 
-def pars_and_mods(d):
+def pars_and_mods(d, global_params):
     """
     Create the initial parameter array and the mod objects needed for
     isochrones.py from the data file provided.
@@ -105,11 +107,9 @@ def pars_and_mods(d):
     mods: (list)
         A list of starmodel objects.
     """
-    # The initial parameters
-    gc = np.array([.7725, .601, .5189])
 
     d = replace_nans_with_inits(d)
-    p0 = np.concatenate((gc, np.log(d.mass.values),
+    p0 = np.concatenate((global_params, np.log(d.mass.values),
                          np.log(d.age.values), d.feh.values,
                          np.log(1./d.parallax.values*1e3),
                          d.Av.values))

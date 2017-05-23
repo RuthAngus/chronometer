@@ -71,17 +71,25 @@ def emcee_lnprob(params, *args):
     The lnprob function used for emcee sampling. Does not break parameters
     into sets.
     """
-    mods, period, period_errs, bv, bv_errs, _ = args
-    g_par_inds = np.concatenate((par_inds[:3], par_inds[3+N:3+2*N]))
-    gyro_lnlike =  sum(-.5*((period - gyro_model(params[g_par_inds], bv))
+    ngyro, nglob, N, mods, period, period_errs, bv, bv_errs, Jz, Jz_err, \
+        par_inds = args
+    age_par_inds = par_inds[nglob+N:nglob+2*N]
+    g_par_inds = np.concatenate((par_inds[:ngyro],
+                                 par_inds[nglob+N:nglob+2*N]))
+    print(params, "params")
+    print(g_par_inds, "g_par_inds")
+    print(params[g_par_inds])
+    assert 0
+    gyro_lnlike = sum(-.5*((period - gyro_model(params[g_par_inds], bv))
                             /period_errs)**2)
+    kin_lnlike = action_age(params[ngyro], params[age_par_inds], Jz, Jz_err)
     p = params*1
-    p[3:3+N] = np.exp(p[3:3+N])
-    p[3+N:3+2*N] = np.log10(1e9*np.exp(p[3+N:3+2*N]))
-    p[3+3*N:3+4*N] = np.exp(p[3+3*N:3+4*N])
-    iso_lnlike = sum([mods[i].lnlike(p[3+i::N]) for i in
-                        range(len(mods))])
-    return gyro_lnlike + iso_lnlike + lnprior(params)
+    p[nglob:nglob+N] = np.exp(p[nglob:nglob+N])
+    p[nglob+N:nglob+2*N] = np.log10(1e9*np.exp(p[nglob+N:nglob+2*N]))
+    p[nglob+nglob*N:nglob+4*N] = np.exp(p[nglob+nglob*N:nglob+4*N])
+    iso_lnlike = sum([mods[i].lnlike(p[nglob+i::N]) for i in
+                      range(len(mods))])
+    return gyro_lnlike + iso_lnlike + kin_lnlike + lnprior(params, *args)
 
 
 def lnprior(params, *args):
@@ -98,6 +106,15 @@ def lnprior(params, *args):
         feh_prior = 0.
         distance_prior = 0.
         mAv = True
+
+    # if kinematics
+    if par_inds[0] == 3:
+        age_prior = sum([np.log(priors.age_prior(np.log10(1e9*np.exp(i))))
+                        for i in params[1:]])
+        if 0 < params[par_inds[0]] < 1e20:
+            return age_prior
+        else:
+            return -np.inf
 
     # If individual stars
     else:
@@ -301,9 +318,9 @@ def find_optimum():
 if __name__ == "__main__":
 
     # Use Metropolis hastings or emcee?
-    run_MH = True
-    RESULTS_DIR = "/Users/ruthangus/projects/chronometer/chronometer/MH"
-    # RESULTS_DIR = "/Users/ruthangus/projects/chronometer/chronometer/emc"
+    run_MH = False
+    # RESULTS_DIR = "/Users/ruthangus/projects/chronometer/chronometer/MH"
+    RESULTS_DIR = "/Users/ruthangus/projects/chronometer/chronometer/emc"
 
     # Load the data for the initial parameter array.
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
@@ -328,24 +345,22 @@ if __name__ == "__main__":
 
     # Construct parameter indices for the different parameter sets.
     par_inds = np.arange(len(params))  # All
-    gyro_par_inds = np.concatenate((par_inds[:ngyro],
-                                    par_inds[nglob+N:nglob+2*N])) # Gyro pars
-    par_inds_list = [gyro_par_inds]
+    age_par_inds = par_inds[nglob+N:nglob+2*N]
+    gyro_par_inds = np.concatenate((par_inds[:ngyro], age_par_inds))
+    kin_par_inds = list(age_par_inds)
+    kin_par_inds.insert(0, par_inds[ngyro])
+    par_inds_list = [gyro_par_inds, np.array(kin_par_inds)]
     for i in range(N):
         par_inds_list.append(par_inds[nglob+i::N])  # Iso stars.
-    print(par_inds_list)
-    assert 0
 
     # Create the covariance matrices.
-    print(len(mods), "len mods")
-    assert 0
-    t = estimate_covariance(N)
-    ts = []
-    for i, par_ind in enumerate(par_inds_list):
-        ti = np.zeros((len(par_ind), len(par_ind)))
-        for j, ind in enumerate(par_ind):
-            ti[j] = t[ind][par_ind]
-        ts.append(ti)
+    # t = estimate_covariance(N)
+    # ts = []
+    # for i, par_ind in enumerate(par_inds_list):
+    #     ti = np.zeros((len(par_ind), len(par_ind)))
+    #     for j, ind in enumerate(par_ind):
+    #         ti[j] = t[ind][par_ind]
+    #     ts.append(ti)
 
     # Sample posteriors using either MH gibbs or emcee
     if run_MH:
@@ -360,11 +375,14 @@ if __name__ == "__main__":
         flat = flat[burnin:, :]
 
     else:
-        emcee_args = [mods, d.period.values, d.period_err.values, d.bv.values,
-                    d.bv_err.values, par_inds_list[0]]
+        emcee_args = [ngyro, nglob, N, mods, d.period.values,
+                      d.period_err.values, d.bv.values,
+                      d.bv_err.values, d.Jz, d.Jz_err, par_inds]
         nwalkers, nsteps, ndim = 64, 10000, len(params)
+        print(emcee_lnprob(params, *emcee_args))
         p0 = [1e-4*np.random.rand(ndim) + params for i in range(nwalkers)]
-        sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob,
+        assert 0
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, emcee_lnprob,
                                         args=emcee_args)
         print("burning in...")
         pos, _, _ = sampler.run_mcmc(p0, 3000)
@@ -374,9 +392,20 @@ if __name__ == "__main__":
         flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
 
         f = h5py.File("emcee_posterior_samples.h5", "w")
-        data = f.create_dataset("samples", np.shape(flat))
+        data = f.create_dataset("action_samples", np.shape(flat))
         data[:, :] = flat
         f.close()
+
+        emcee_labels = ["$a$", "$b$", "$n$", "$\\beta$", "$\ln(Mass_1)$",
+                        "$\ln(Mass_2)$", "$\ln(Mass_3)$", "$\ln(Age_{1,i})$",
+                        "$\ln(Age_{2,i})$", "$\ln(Age_{3,i})$", "$[Fe/H]_1$",
+                        "$[Fe/H]_2$", "$[Fe/H]_3$", "$\ln(D_1)$",
+                        "$\ln(D_2)$", "$\ln(D_3)$", "$A_{v1}$", "$A_{v2}$",
+                        "$A_{v3}$", "$\ln(Age_{1,g})$", "$\ln(Age_{2,g})$",
+                        "$\ln(Age_{3,g})$"]
+        fig = corner.corner(flat, truths=truths, labels=labels)
+        fig.savefig(os.path.join(RESULTS_DIR, "emcee_corner"))
+        assert 0
 
     end = time.time()
     print("Time taken = ", (end - start)/60, "minutes")
