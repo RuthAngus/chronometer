@@ -6,9 +6,11 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+from calculate_actions import convert_coords_to_actions, save_pd_file
+import teff_bv as tbv
 
 
-def create_and_save_df(*args):
+def create_and_save_df(fn, *args):
     """
     Create the pandas dataframe, append dictionaries to it and save it as a
     csv file.
@@ -20,7 +22,7 @@ def create_and_save_df(*args):
     """
     frames = [i for i in args]
     df = pd.concat(frames, axis=0)
-    df.to_csv(os.path.join(DATA_DIR, "data.csv"))
+    df.to_csv(os.path.join(DATA_DIR, fn))
 
 
 if __name__ == "__main__":
@@ -31,4 +33,14 @@ if __name__ == "__main__":
     tgas = tgas.iloc[:2, :]
 
     # create_and_save_df(sun, NGC2019)
-    create_and_save_df(sun, NGC2019, tgas)
+    fn = "data.csv"
+    create_and_save_df(fn, sun, NGC2019, tgas)
+    df = pd.read_csv(os.path.join(DATA_DIR, fn))
+
+    # Calculate B-Vs
+    bv = tbv.teff2bv(df.teff.values, df.logg.values, df.feh.values)
+    df["bv"] = bv
+
+    # Calculate actions
+    action_array = convert_coords_to_actions(df)
+    save_pd_file(df, os.path.join(DATA_DIR, "action_data.csv"), action_array)
