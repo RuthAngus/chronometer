@@ -44,8 +44,9 @@ def action_age(par, t, Jz, Jz_err):
     Vertical action is drawn from a Normal distribution with zero mean and
     dispersion that is a function of time.
     """
-    if par > 0:
-        return np.sum(-.5*(Jz**2/(par*t + Jz_err**2)) - \
-            .5*np.log(2*np.pi*(par*t + Jz_err**2)))
+    beta = np.exp(par)
+    if beta > 0:
+        return np.sum(-.5*(Jz**2/(beta*t + Jz_err**2)) - \
+            .5*np.log(2*np.pi*(beta*t + Jz_err**2)))
     else:
         return -np.inf
