@@ -31,6 +31,9 @@ def replace_nans_with_inits(data):
     data.parallax.values[~np.isfinite(data.parallax.values)] \
         = np.zeros(len(data.parallax.values[~np.isfinite(
             data.parallax.values)]))
+    data.tgas_parallax.values[~np.isfinite(data.tgas_parallax.values)] \
+        = np.zeros(len(data.tgas_parallax.values[~np.isfinite(
+            data.tgas_parallax.values)]))
     data.age.values[~np.isfinite(data.age.values)] \
         = np.ones(len(data.age.values[~np.isfinite(data.age.values)])) * \
         np.log(2)
@@ -101,10 +104,28 @@ def transform_parameters(lnparams, indicator, all_params):
         return p, N
 
 
+def combine_columns(d, col1, col2):
+    """
+    Where there are two columns that need to be combined. Return the combined
+    columns, col1 and col2.
+    d: the pd dataframe.
+    col1: (array)
+        The first column as an array
+    col2: (array)
+        The second ".
+    """
+    a = np.ones(len(col1)) * np.nan
+    m1, m2 = np.isfinite(col1), np.isfinite(col2)
+    a[m1], a[m2] = col1[m1], col2[m2]
+    return a
+
+
 def pars_and_mods(d, global_params):
     """
     Create the initial parameter array and the mod objects needed for
     isochrones.py from the data file provided.
+    Also, perform some operations on the data: merge multiple parallax columns
+    and covert teffs into B-V.
     returns:
     -------
     p0: (array)
