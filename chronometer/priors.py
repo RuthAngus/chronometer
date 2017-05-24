@@ -29,7 +29,7 @@ def distance_prior(distance, bounds=(0,3000)):
     Distance prior ~ d^2
     """
     min_distance, max_distance = bounds
-    if distance <= min_distance or distance > max_distance:
+    if distance.any() <= min_distance or distance.any() > max_distance:
         return 0
     return 3/max_distance**3 * distance**2
 
