@@ -9,7 +9,24 @@ from isochrones import StarModel
 from isochrones.mist import MIST_Isochrone
 
 
-def replace_nans_with_inits(data):
+def mask_column(d, col, val):
+    """
+    Turn all the NaNs into the val.
+    params:
+    ------
+    d: (pandas.DataFrame)
+        The data
+    col: (array)
+        The array to mask.
+    val: (float)
+        The value to convert the NaNs into.
+    """
+    m = np.isfinite(col)
+    col[~m] = np.ones(len(col[~m]))*val
+    return col
+
+
+def replace_nans_with_inits(d):
     """
     Turn the data into reasonable initial values.
     params:
@@ -22,22 +39,17 @@ def replace_nans_with_inits(data):
     If no initial Av is provided, initialise with 0.
     """
 
-    data.mass.values[~np.isfinite(data.mass.values)] \
-        = np.ones(len(data.mass.values[~np.isfinite(data.mass.values)]))
-    data.feh.values[~np.isfinite(data.feh.values)] \
-        = np.zeros(len(data.feh.values[~np.isfinite(data.feh.values)]))
-    data.Av.values[~np.isfinite(data.Av.values)] \
-        = np.zeros(len(data.Av.values[~np.isfinite(data.Av.values)]))
-    data.tgas_parallax.values[~np.isfinite(data.tgas_parallax.values)] \
-        = np.zeros(len(data.tgas_parallax.values[~np.isfinite(
-            data.tgas_parallax.values)]))
-    data.tgas_parallax.values[~np.isfinite(data.tgas_parallax.values)] \
-        = np.zeros(len(data.tgas_parallax.values[~np.isfinite(
-            data.tgas_parallax.values)]))
-    data.age.values[~np.isfinite(data.age.values)] \
-        = np.ones(len(data.age.values[~np.isfinite(data.age.values)])) * \
-        np.log(2)
-    return data
+    mass = mask_column(d, d.mass.values, 1.)
+    d["mass"] = mass
+    feh = mask_column(d, d.feh.values, 0.)
+    d["feh"] = feh
+    Av = mask_column(d, d.Av.values, 0.)
+    d["Av"] = Av
+    tgas_parallax = mask_column(d, d.tgas_parallax.values, 0.)
+    d["tgas_parallax"] = tgas_parallax
+    age = mask_column(d, d.age.values, np.log(2))
+    d["age"] = age
+    return d
 
 
 def vk2teff(vk):
@@ -127,7 +139,7 @@ def pars_and_mods(d, global_params):
     # iso_lnlike preamble - make a list of 'mod' objects: one for each star.
     mist = MIST_Isochrone()
     mods = []
-    for i in range(len(d.period.values)):
+    for i in range(len(d.prot.values)):
         param_dict = make_param_dict(d, i)
 
         # Remove missing parameters from the dict.
