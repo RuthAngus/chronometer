@@ -1,6 +1,7 @@
 """
 Take the parallax and proper motions of a TGAS star and calculate Jz.
 Append Jz to a csv file.
+Save file as action_data.csv
 """
 
 import numpy as np
