@@ -28,9 +28,9 @@ def replace_nans_with_inits(data):
         = np.zeros(len(data.feh.values[~np.isfinite(data.feh.values)]))
     data.Av.values[~np.isfinite(data.Av.values)] \
         = np.zeros(len(data.Av.values[~np.isfinite(data.Av.values)]))
-    data.parallax.values[~np.isfinite(data.parallax.values)] \
-        = np.zeros(len(data.parallax.values[~np.isfinite(
-            data.parallax.values)]))
+    data.tgas_parallax.values[~np.isfinite(data.tgas_parallax.values)] \
+        = np.zeros(len(data.tgas_parallax.values[~np.isfinite(
+            data.tgas_parallax.values)]))
     data.tgas_parallax.values[~np.isfinite(data.tgas_parallax.values)] \
         = np.zeros(len(data.tgas_parallax.values[~np.isfinite(
             data.tgas_parallax.values)]))
@@ -64,18 +64,18 @@ def make_param_dict(d, i):
     i: (int)
         The index of the star.
     """
-    param_dict = {"J": (d.j.values[i], d.j_err.values[i]),
-                  "H": (d.h.values[i], d.h_err.values[i]),
-                  "K": (d.k.values[i], d.k_err.values[i]),
+    param_dict = {"J": (d.jmag.values[i], d.jmag_err.values[i]),
+                  "H": (d.hmag.values[i], d.hmag_err.values[i]),
+                  "K": (d.kmag.values[i], d.kmag_err.values[i]),
                   "G": (d.tgas_phot_g_mean_mag.values[i],
                         d.tgas_phot_g_mean_flux_error.values[i]/
                         d.tgas_phot_g_mean_flux.values[i] *
                         d.tgas_phot_g_mean_mag.values[i]),
-                  "Teff": (d.Teff.values[i], d.Teff_err.values[i]),
-                  "logg": (d.logg.values[i], d.logg_err.values[i]),
-                  "feh": (d.feh.values[i], d.feh_err.values[i]),
-                  "parallax": (d.parallax.values[i],
-                               d.parallax_err.values[i])}  # FIXME: add more filters
+                  "Teff": (d.teff.values[i], d.teff_err1.values[i]),
+                  "logg": (d.logg.values[i], d.logg_err1.values[i]),
+                  "feh": (d.feh.values[i], d.feh_err1.values[i]),
+                  "parallax": (d.tgas_parallax.values[i],
+                               d.tgas_parallax_error.values[i])}  # FIXME: add more filters
     return param_dict
 
 
@@ -121,7 +121,7 @@ def pars_and_mods(d, global_params):
     d = replace_nans_with_inits(d)
     p0 = np.concatenate((global_params, np.log(d.mass.values),
                          np.log(d.age.values), d.feh.values,
-                         np.log(1./d.parallax.values*1e3),
+                         np.log(1./d.tgas_parallax.values*1e3),
                          d.Av.values))
 
     # iso_lnlike preamble - make a list of 'mod' objects: one for each star.
