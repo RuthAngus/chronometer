@@ -34,6 +34,11 @@ def gyro_model(params, bv):
     a, b, n = params[:3]
     N = len(bv)
     ln_age = params[3:3+N]
+    # p = a*(np.exp(ln_age)*1e3)**n * (bv - .4)**b
+    # mp = np.isfinite(p)
+    # p[~mp] = np.array([None] * len(p[~mp]))  # Using Nones for B-V < .4
+    # return p
+    # mbv = bv > .4
     return a*(np.exp(ln_age)*1e3)**n * (bv - .4)**b
 
 
