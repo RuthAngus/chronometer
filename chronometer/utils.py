@@ -8,6 +8,7 @@ import pandas as pd
 from isochrones import StarModel
 from isochrones.mist import MIST_Isochrone
 
+
 def replace_nans_with_inits(data):
     """
     Turn the data into reasonable initial values.
@@ -20,6 +21,7 @@ def replace_nans_with_inits(data):
     If no initial feh is provided, initialise with solar feh.
     If no initial Av is provided, initialise with 0.
     """
+
     data.mass.values[~np.isfinite(data.mass.values)] \
         = np.ones(len(data.mass.values[~np.isfinite(data.mass.values)]))
     data.feh.values[~np.isfinite(data.feh.values)] \
@@ -29,6 +31,9 @@ def replace_nans_with_inits(data):
     data.parallax.values[~np.isfinite(data.parallax.values)] \
         = np.zeros(len(data.parallax.values[~np.isfinite(
             data.parallax.values)]))
+    data.age.values[~np.isfinite(data.age.values)] \
+        = np.ones(len(data.age.values[~np.isfinite(data.age.values)])) * \
+        np.log(2)
     return data
 
 
