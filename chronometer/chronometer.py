@@ -15,7 +15,7 @@ import h5py
 
 import corner
 import priors
-from models import gc_model, gyro_model
+from models import gc_model, gyro_model, action_age
 import emcee
 
 from utils import replace_nans_with_inits, vk2teff, make_param_dict, \
@@ -76,12 +76,18 @@ def emcee_lnprob(params, *args):
     age_par_inds = par_inds[nglob+N:nglob+2*N]
     g_par_inds = np.concatenate((par_inds[:ngyro],
                                  par_inds[nglob+N:nglob+2*N]))
-    print(params, "params")
-    print(g_par_inds, "g_par_inds")
-    print(params[g_par_inds])
-    assert 0
-    gyro_lnlike = sum(-.5*((period - gyro_model(params[g_par_inds], bv))
-                            /period_errs)**2)
+    m = (bv > .4) * (np.isfinite(period))
+    g_par_inds_mask = np.concatenate((g_par_inds[:3], g_par_inds[3:][m]))
+    print(g_par_inds_mask)
+    gyro_lnlike = sum(-.5*((period[m] - gyro_model(params[g_par_inds_mask],
+                                                     bv[m]))
+                            /period_errs[m])**2)
+    print(bv, "bv")
+    print(period[m], "period")
+    print(-.5*((period[m] - gyro_model(params[g_par_inds], bv[m]))
+               / period_errs[m])**2, "not sum")
+    print(params[g_par_inds], "params")
+    print(gyro_model(params[g_par_inds_mask], bv[m]), "model")
     kin_lnlike = action_age(params[ngyro], params[age_par_inds], Jz, Jz_err)
     p = params*1
     p[nglob:nglob+N] = np.exp(p[nglob:nglob+N])
@@ -89,6 +95,7 @@ def emcee_lnprob(params, *args):
     p[nglob+nglob*N:nglob+4*N] = np.exp(p[nglob+nglob*N:nglob+4*N])
     iso_lnlike = sum([mods[i].lnlike(p[nglob+i::N]) for i in
                       range(len(mods))])
+    print(gyro_lnlike, iso_lnlike, kin_lnlike, lnprior(params, *args))
     return gyro_lnlike + iso_lnlike + kin_lnlike + lnprior(params, *args)
 
 
@@ -342,6 +349,7 @@ if __name__ == "__main__":
     N = len(mods)  # number of stars
     nglob, nind = 4, 5  # number of global pars and number of per-star pars.
     ngyro = 3  # number of gyro parameters.
+    print(N, "stars")
 
     # Construct parameter indices for the different parameter sets.
     par_inds = np.arange(len(params))  # All
