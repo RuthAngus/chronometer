@@ -98,7 +98,12 @@ def emcee_lnprob(params, *args):
     gyro_lnlike = sum(-.5*((period[m] - gyro_model(params[g_par_inds_mask],
                                                      bv[m]))
                             /period_errs[m])**2)
-    kin_lnlike = action_age(params[ngyro], params[age_par_inds], Jz, Jz_err)
+
+    # A list of kinematic indices.
+    kin_inds = list(range(nglob+N, nglob+N+nind))
+    kin_inds.insert(0, ngyro)
+    kin_lnlike = action_age(params[kin_inds], Jz, Jz_err)
+
     p = params*1
     p[nglob:nglob+N] = np.exp(p[nglob:nglob+N])
     p[nglob+N:nglob+2*N] = np.log10(1e9*np.exp(p[nglob+N:nglob+2*N]))
@@ -163,7 +168,7 @@ def emcee_lnprior(params, *args):
     mAv = (0 <= params[nglob+4*N:nglob+5*N]) * \
         (params[nglob+4*N:nglob+5*N] < 1)  # Prior on A_v
     m = (-20 < params) * (params < 20)  # Broad bounds on all params.
-    mbeta = 0 < params[ngyro] < 1e20  # Prior on beta
+    mbeta = -20 < params[ngyro] < 20  # Prior on beta
     if sum(m) == len(m) and sum(mAv) == len(mAv) and mbeta:
         return g_prior + age_prior + feh_prior + distance_prior
     else:
@@ -377,9 +382,7 @@ if __name__ == "__main__":
     # Set nsteps and niter.
     nsteps = 1000
     niter = 10
-    N = len(mods)  # number of stars
-    nglob, nind = 4, 5  # number of global pars and number of per-star pars.
-    ngyro = 3  # number of gyro parameters.
+    N, ngyro, nglob, nind = get_n_things(mods, params)
     print(N, "stars")
 
     # Construct parameter indices for the different parameter sets.
@@ -417,12 +420,12 @@ if __name__ == "__main__":
         emcee_args = [mods, d.prot.values,
                       d.prot_err.values, d.bv.values,
                       d.bv_err.values, d.Jz, d.Jz_err, par_inds]
-        nwalkers, nsteps, ndim = 64, 2000, len(params)
+        nwalkers, nsteps, ndim = 64, 10000, len(params)
         p0 = [1e-4*np.random.rand(ndim) + params for i in range(nwalkers)]
         sampler = emcee.EnsembleSampler(nwalkers, ndim, emcee_lnprob,
                                         args=emcee_args)
         print("burning in...")
-        pos, _, _ = sampler.run_mcmc(p0, 500)
+        pos, _, _ = sampler.run_mcmc(p0, 5000)
         sampler.reset()
         print("production run...")
         sampler.run_mcmc(pos, nsteps)
