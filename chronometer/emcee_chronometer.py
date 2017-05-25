@@ -1,6 +1,5 @@
 """
-Now use Gibbs sampling to update individual star parameters and global gyro
-parameters.
+Use emcee to produce posterior samples.
 """
 
 import os
