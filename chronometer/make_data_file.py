@@ -29,7 +29,7 @@ if __name__ == "__main__":
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
     sun = pd.read_csv(os.path.join(DATA_DIR, "sun.csv"))
     NGC2019 = pd.read_csv(os.path.join(DATA_DIR, "NGC2019.csv"))
-    tgas = pd.read_csv(os.path.join(DATA_DIR, "kic_tgas.csv"))
+    tgas = pd.read_csv(os.path.join(DATA_DIR, "kplr_tgas_periods.csv"))
     tgas = tgas.iloc[:2, :]
 
     # create_and_save_df(sun, NGC2019)
@@ -44,3 +44,6 @@ if __name__ == "__main__":
     # Calculate actions
     action_array = convert_coords_to_actions(df)
     save_pd_file(df, os.path.join(DATA_DIR, "action_data.csv"), action_array)
+
+    print(df["prot"])
+    print(df["tgas_parallax"])
