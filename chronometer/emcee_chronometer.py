@@ -44,30 +44,24 @@ def emcee_lnprob(params, *args):
     The lnprob function used for emcee sampling. Does not break parameters
     into sets.
     """
-    N, ngyro, nglob, nind = get_n_things(args[0], params)
-    mods, period, period_errs, bv, bv_errs, Jz, Jz_err, par_inds = args
-    age_par_inds = par_inds[nglob+N:nglob+2*N]
-    g_par_inds = np.concatenate((par_inds[:ngyro],
-                                 par_inds[nglob+N:nglob+2*N]))
-    m = (bv > .4) * (np.isfinite(period))
-    g_par_inds_mask = np.concatenate((g_par_inds[:3], g_par_inds[3:][m]))
+    mods, period, period_errs, bv, bv_errs, Jz, Jz_err, N, ngyro, nglob, \
+        nind, g_par_inds_mask, kin_inds, m = args
+
     gyro_lnlike = sum(-.5*((period[m] - gyro_model(params[g_par_inds_mask],
                                                      bv[m]))
                             /period_errs[m])**2)
 
-    # A list of kinematic indices.
-    kin_inds = list(range(nglob+N, nglob+N+nind))
-    kin_inds.insert(0, ngyro)
     kin_lnlike = action_age(params[kin_inds], Jz, Jz_err)
 
     p = params*1
-    p[nglob:nglob+N] = np.exp(p[nglob:nglob+N])
-    p[nglob+N:nglob+2*N] = np.log10(1e9*np.exp(p[nglob+N:nglob+2*N]))
-    p[nglob+nglob*N:nglob+4*N] = np.exp(p[nglob+nglob*N:nglob+4*N])
+    p[nglob:nglob+N] = np.exp(p[nglob:nglob+N])  # mass
+    p[nglob+N:nglob+2*N] = np.log10(1e9*np.exp(p[nglob+N:nglob+2*N]))  # age
+    p[nglob+3*N:nglob+4*N] = np.exp(p[nglob+3*N:nglob+4*N])  # dist
     iso_lnlike = sum([mods[i].lnlike(p[nglob+i::N]) for i in
                       range(len(mods))])
     return gyro_lnlike + iso_lnlike + kin_lnlike + \
         emcee_lnprior(params, *args)
+    # return gyro_lnlike + emcee_lnprior(params, *args)
 
 
 def emcee_lnprior(params, *args):
@@ -111,20 +105,36 @@ if __name__ == "__main__":
 
     # Construct parameter indices for the different parameter sets.
     par_inds = np.arange(len(params))  # All
+    g_par_inds = np.concatenate((par_inds[:ngyro],
+                                 par_inds[nglob+N:nglob+2*N]))
+    m = (d.bv.values > .4) * (np.isfinite(d.prot.values))
+    g_par_inds_mask = np.concatenate((g_par_inds[:3], g_par_inds[3:][m]))
+
+    # A list of kinematic indices.
+    kin_inds = list(range(nglob+N, nglob+N+nind))
+    kin_inds.insert(0, ngyro)
 
     emcee_args = [mods, d.prot.values,
-                d.prot_err.values, d.bv.values,
-                d.bv_err.values, d.Jz, d.Jz_err, par_inds]
-    nwalkers, nsteps, ndim = 64, 15000, len(params)
+                  d.prot_err.values, d.bv.values, d.bv_err.values, d.Jz,
+                  d.Jz_err, N, ngyro, nglob, nind, g_par_inds_mask, kin_inds,
+                  m]
+    nwalkers, nsteps, ndim, mult = 64, 100, len(params), 5
     p0 = [1e-4*np.random.rand(ndim) + params for i in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, emcee_lnprob,
                                     args=emcee_args)
     print("burning in...")
-    pos, _, _ = sampler.run_mcmc(p0, 10000)
+    start = time.time()
+    pos, _, _ = sampler.run_mcmc(p0, nsteps)
+    end = time.time()
+    print("Time = ", (end - start)/60, "minutes")
+    print("Predicted run time = ", (end - start)/60 * mult, "minutes")
     sampler.reset()
     print("production run...")
-    sampler.run_mcmc(pos, nsteps)
-    flat = np.reshape(sampler.chain, (nwalkers*nsteps, ndim))
+    start = time.time()
+    sampler.run_mcmc(pos, mult*nsteps)
+    end = time.time()
+    print("Time = ", (end - start)/60, "minutes")
+    flat = np.reshape(sampler.chain, (nwalkers*nsteps*mult, ndim))
 
     f = h5py.File("emcee_posterior_samples.h5", "w")
     data = f.create_dataset("action_samples", np.shape(flat))
@@ -143,6 +153,7 @@ if __name__ == "__main__":
                     "$\ln(D_4)$", "$\ln(D_5)$",
                     "$A_{v1}$", "$A_{v2}$", "$A_{v3}$",
                     "$A_{v4}$", "$A_{v5}$"]
+    print("Making corner plot")
     fig = corner.corner(flat, labels=emcee_labels)
     fig.savefig(os.path.join(RESULTS_DIR, "emcee_corner"))
 
