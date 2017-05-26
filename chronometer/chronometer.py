@@ -56,20 +56,31 @@ def lnlike(params, *args):
     par_inds: (array) args[-1]
         The indices of the parameters to vary.
     """
-    mods, period, period_errs, bv, bv_errs, par_inds = args
+    mods, period, period_errs, bv, bv_errs, jz, jz_err, par_inds = args
     N, ngyro, nglob, nind = get_n_things(mods, params)
-    gyro_lnlike, iso_lnlike = 0, 0
+    gyro_lnlike, iso_lnlike, kin_lnlike = 0, 0, 0
     if par_inds[0] == 0 and par_inds[1] == 1 and par_inds[2] == 2: # if gyro.
         # r = np.isfinite(period)
         # r_period, r_period_errs, r_bv = period[r], period_errs[r], bv[r]
         # gyro_lnlike = sum(-.5*((r_period - gyro_model(params, r_bv))
                                 # /r_period_errs)**2)
         m = (bv > .4) * (np.isfinite(period))
+        print(m)
         par_inds_mask = np.concatenate((par_inds[:ngyro],
-                                        g_par_inds[ngyro:][m]))
+                                        par_inds[ngyro:][m]))
+        print(par_inds_mask, type(par_inds_mask))
+        print(len(params[par_inds_mask]))
+        print(len(bv[m]), len(period[m]),
+              len(period_errs[m]))
         gyro_lnlike = sum(-.5*((period[m] - gyro_model(params[par_inds_mask],
                                                        bv[m]))
                                 /period_errs[m])**2)
+
+    elif par_inds[0] == 3:  # If kinematics
+        m = np.isfinite(jz)
+        kin_inds_mask = np.concatenate((np.array([par_inds[:1]]),
+                                        par_inds[nglob:][m]))
+        kin_lnlike = action_age(params[kin_inds_mask], Jz, Jz_err)
 
     # If not gyro but single stars
     else:
@@ -80,7 +91,7 @@ def lnlike(params, *args):
         p[1] = np.log10(1e9*np.exp(p[1]))
         p[3] = np.exp(p[3])
         iso_lnlike = ms.lnlike(p)
-    return gyro_lnlike + iso_lnlike
+    return gyro_lnlike + iso_lnlike + kin_lnlike
 
 
 def lnprior(params, *args):
@@ -102,7 +113,7 @@ def lnprior(params, *args):
     if par_inds[0] == 3:
         age_prior = sum([np.log(priors.age_prior(np.log10(1e9*np.exp(i))))
                         for i in params[1:]])
-        if 0 < params[par_inds[0]] < 1e20:
+        if -20 < params[par_inds[0]] < 20:
             return age_prior
         else:
             return -np.inf
@@ -242,8 +253,8 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
     nstars = len(args[0])
     n_parameter_sets = len(par_inds_list)
 
-    # Final sample array
-    all_samples = np.zeros((nsteps * niter, ndim + nstars))
+    # Final sample array. The 2*nstars is for the extra age samples.
+    all_samples = np.zeros((nsteps * niter, ndim + 2*nstars))
 
     # Iterate over niter cycles of parameter sets.
     probs = []
@@ -254,11 +265,20 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
             args[-1] = par_inds_list[k]
             samples, par, pb = MH(par, lnprob, nsteps, t[k],
                                                    *args)
-            if par_inds_list[k][0] == 0:  # save age samples separately
+
+            # save age samples separately: gyro samples.
+            if par_inds_list[k][0] == 0:
                 all_samples[nsteps*i:nsteps*(i+1), par_inds_list[k][:3]] = \
                     samples[:, :3]
                 all_samples[nsteps*i:nsteps*(i+1), -nstars:] = \
                     samples[:, 3:]
+
+            if par_inds_list[k][0] == 3:  # save age samples separately
+                print(par_inds_list[k][3])
+                all_samples[nsteps*i:nsteps*(i+1), par_inds_list[k][3]] = \
+                    samples[:, 0]
+                all_samples[nsteps*i:nsteps*(i+1), -nstars:] = \
+                    samples[:, 1:]
             else:
                 all_samples[nsteps*i:nsteps*(i+1), par_inds_list[k]] = samples
             probs.append(pb)
@@ -276,24 +296,25 @@ def estimate_covariance(nstars):
     matrix, repeat the last five columns and rows nstar times.
     """
     with h5py.File("emcee_posterior_samples.h5", "r") as f:
-        samples = f["samples"][...]
+        samples = f["action_samples"][...]
     cov = np.cov(samples, rowvar=False)
-    # return cov
-    print(np.shape(cov))
-    n = (np.shape(cov)[0] - 3)/5
-    print(n)
-    nadd = nstars - n
-    print(nadd)
-    star_cov_column = cov[:, -5:]
-    print(np.shape(star_cov_column))
-    for i in range(nadd):
-        newcov = np.vstack((cov, star_cov_column))
-        print(np.shape(newcov))
-        newcov = np.hstack((cov, star_cov_column.T))
-        print(np.shape(newcov))
-    print(np.shape(newcov))
-    assert 0
-    return newcov
+    return cov
+
+    # print(np.shape(cov))
+    # n = (np.shape(cov)[0] - 3)/5
+    # print(n)
+    # nadd = nstars - n
+    # print(nadd)
+    # star_cov_column = cov[:, -5:]
+    # print(np.shape(star_cov_column))
+    # for i in range(nadd):
+    #     newcov = np.vstack((cov, star_cov_column))
+    #     print(np.shape(newcov))
+    #     newcov = np.hstack((cov, star_cov_column.T))
+    #     print(np.shape(newcov))
+    # print(np.shape(newcov))
+    # assert 0
+    # return newcov
 
 
 def find_optimum():
@@ -301,7 +322,7 @@ def find_optimum():
     Return the median of the emcee samples.
     """
     with h5py.File("emcee_posterior_samples.h5", "r") as f:
-        samples = f["samples"][...]
+        samples = f["action_samples"][...]
     ndim = np.shape(samples)[1]
     return np.array([np.median(samples[:, i]) for i in range(ndim)])
 
@@ -340,19 +361,19 @@ if __name__ == "__main__":
         par_inds_list.append(par_inds[nglob+i::N])  # Iso stars.
 
     # Create the covariance matrices.
-    # t = estimate_covariance(N)
-    # ts = []
-    # for i, par_ind in enumerate(par_inds_list):
-    #     ti = np.zeros((len(par_ind), len(par_ind)))
-    #     for j, ind in enumerate(par_ind):
-    #         ti[j] = t[ind][par_ind]
-    #     ts.append(ti)
+    t = estimate_covariance(N)
+    ts = []
+    for i, par_ind in enumerate(par_inds_list):
+        ti = np.zeros((len(par_ind), len(par_ind)))
+        for j, ind in enumerate(par_ind):
+            ti[j] = t[ind][par_ind]
+        ts.append(ti)
 
     # Sample posteriors using MH gibbs
     args = [mods, d.prot.values, d.prot_err.values, d.bv.values,
-            d.bv_err.values, par_inds_list]
+            d.bv_err.values, d.Jz.values, d.Jz_err.values, par_inds_list]
     flat, lnprobs = gibbs_control(params, lnprob, nsteps, niter, ts,
-                                par_inds_list, args)
+                                  par_inds_list, args)
 
     # Throw away _number_ Gibbs iterations as burn in. FIXME
     number = 2
@@ -364,22 +385,31 @@ if __name__ == "__main__":
 
     print("Plotting results and traces")
     plt.clf()
-    if run_MH:
-        for j in range(int(len(lnprobs)/nsteps - 1)):
-            x = np.arange(j*nsteps, (j+1)*nsteps)
-            plt.plot(x, lnprobs[j*nsteps: (j+1)*nsteps])
-    else:
-        plt.plot(sampler.lnprobability.T)
+    for j in range(int(len(lnprobs)/nsteps - 1)):
+        x = np.arange(j*nsteps, (j+1)*nsteps)
+        plt.plot(x, lnprobs[j*nsteps: (j+1)*nsteps])
     plt.xlabel("Time")
     plt.ylabel("ln (probability)")
     plt.savefig(os.path.join(RESULTS_DIR, "prob_trace"))
 
-    labels = ["$a$", "$b$", "$n$", "$\ln(Mass_1)$", "$\ln(Mass_2)$",
-              "$\ln(Mass_3)$", "$\ln(Age_{1,i})$", "$\ln(Age_{2,i})$",
-              "$\ln(Age_{3,i})$", "$[Fe/H]_1$", "$[Fe/H]_2$", "$[Fe/H]_3$",
-              "$\ln(D_1)$", "$\ln(D_2)$", "$\ln(D_3)$", "$A_{v1}$",
-              "$A_{v2}$", "$A_{v3}$", "$\ln(Age_{1,g})$",
-              "$\ln(Age_{2,g})$", "$\ln(Age_{3,g})$"]
+    labels = ["$a$", "$b$", "$n$", "$\\beta$",
+                    "$\ln(Mass_1)$", "$\ln(Mass_2)$", "$\ln(Mass_3)$",
+                    "$\ln(Mass_4)$", "$\ln(Mass_5)$",
+                    "$\ln(Age_{1,i})$", "$\ln(Age_{2,i})$",
+                    "$\ln(Age_{3,i})$", "$\ln(Age_{4,i})$",
+                    "$\ln(Age_{5,i})$",
+                    "$[Fe/H]_1$", "$[Fe/H]_2$", "$[Fe/H]_3$",
+                    "$[Fe/H]_4$", "$[Fe/H]_5$",
+                    "$\ln(D_1)$", "$\ln(D_2)$", "$\ln(D_3)$",
+                    "$\ln(D_4)$", "$\ln(D_5)$",
+                    "$A_{v1}$", "$A_{v2}$", "$A_{v3}$",
+                    "$A_{v4}$", "$A_{v5}$",
+                    "$\ln(Age_{1,g})$", "$\ln(Age_{2,g})$",
+                    "$\ln(Age_{3,g})$", "$\ln(Age_{4,g})$",
+                    "$\ln(Age_{5,g})$",
+                    "$\ln(Age_{1,k})$", "$\ln(Age_{2,k})$",
+                    "$\ln(Age_{3,k})$", "$\ln(Age_{4,k})$",
+                    "$\ln(Age_{5,k})$"]
 
     ages = np.zeros((np.shape(flat)[0]*2, N))
     for i in range(N):
@@ -393,14 +423,10 @@ if __name__ == "__main__":
     ndim = len(params)
     for i in range(ndim):
         plt.clf()
-        if run_MH:
-            for j in range(niter - number):
-                x = np.arange(j*nsteps, (j+1)*nsteps)
-                plt.plot(x, flat[j*nsteps: (j+1)*nsteps, i].T)
-                plt.ylabel(labels[i])
-        else:
-            plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
-        plt.savefig(os.path.join(RESULTS_DIR, "{}_trace".format(i)))
+        for j in range(niter - number):
+            x = np.arange(j*nsteps, (j+1)*nsteps)
+            plt.plot(x, flat[j*nsteps: (j+1)*nsteps, i].T)
+            plt.ylabel(labels[i])
 
     print("Making corner plot")
     truths = [.7725, .601, .5189, np.log(1), None, None, np.log(4.56),
