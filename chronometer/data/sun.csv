@@ -1,2 +1,2 @@
-age,age_err,bv,bv_err,period,period_err,jmag,jmag_err,hmag,hmag_err,kmag,kmag_err,tgas_parallax,tgas_parallax_error,teff,teff_err1,logg,logg_err1,feh,feh_err1,mass,mass_err,Av,Av_err
+age,age_err,bv,bv_err,prot,prot_err,jmag,jmag_err,hmag,hmag_err,kmag,kmag_err,tgas_parallax,tgas_parallax_error,teff,teff_err1,logg,logg_err1,feh,feh_err1,mass,mass_err,Av,Av_err
 4.567,.01,.65,.01,26.,2.,3.711,.01,3.452,.01,3.357,.01,100.,1.,5700,100,4.45,.01,0.,.1,1.,.1,0.,.1

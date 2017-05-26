@@ -118,7 +118,7 @@ if __name__ == "__main__":
                   d.prot_err.values, d.bv.values, d.bv_err.values, d.Jz,
                   d.Jz_err, N, ngyro, nglob, nind, g_par_inds_mask, kin_inds,
                   m]
-    nwalkers, nsteps, ndim, mult = 64, 100, len(params), 5
+    nwalkers, nsteps, ndim, mult = 64, 1000, len(params), 5
     p0 = [1e-4*np.random.rand(ndim) + params for i in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, emcee_lnprob,
                                     args=emcee_args)
@@ -158,7 +158,9 @@ if __name__ == "__main__":
     fig.savefig(os.path.join(RESULTS_DIR, "emcee_corner"))
 
     # Plot chains
+    print("plotting chains")
     for i in range(ndim):
+        print(i, "of", len(params))
         plt.clf()
         plt.plot(sampler.chain[:, :,  i].T, alpha=.5)
         plt.savefig(os.path.join(RESULTS_DIR, "{}_trace".format(i)))
