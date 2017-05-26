@@ -37,16 +37,16 @@ def gyro_model(params, bv):
     return a*(np.exp(ln_age)*1e3)**n * (bv - .4)**b
 
 
-def action_age(par, t, Jz, Jz_err):
+def action_age(par, Jz, Jz_err):
     """
     Given a vertical action, calculate an age.
     Vertical action dispersion increases with time.
     Vertical action is drawn from a Normal distribution with zero mean and
     dispersion that is a function of time.
     """
-    beta = np.exp(par)
+    beta, ages = np.exp(par[0]), np.exp(par[1:])
     if beta > 0:
-        return np.sum(-.5*(Jz**2/(beta*t + Jz_err**2)) - \
-            .5*np.log(2*np.pi*(beta*t + Jz_err**2)))
+        return np.sum(-.5*(Jz**2/(beta*ages + Jz_err**2)) - \
+            .5*np.log(2*np.pi*(beta*ages + Jz_err**2)))
     else:
         return -np.inf
