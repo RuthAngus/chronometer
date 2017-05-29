@@ -36,7 +36,7 @@ def get_n_things(mods, params):
     """
     N, nind = len(mods), 5
     ngyro = 3
-    nglob = len(params) - (N*nind)
+    nglob = 4
     return N, ngyro, nglob, nind
 
 
@@ -64,33 +64,38 @@ def lnlike(params, *args):
         # r_period, r_period_errs, r_bv = period[r], period_errs[r], bv[r]
         # gyro_lnlike = sum(-.5*((r_period - gyro_model(params, r_bv))
                                 # /r_period_errs)**2)
+
+        # Mask out stars without periods
         m = (bv > .4) * (np.isfinite(period))
-        print(m)
-        par_inds_mask = np.concatenate((par_inds[:ngyro],
-                                        par_inds[ngyro:][m]))
-        print(par_inds_mask, type(par_inds_mask))
-        print(len(params[par_inds_mask]))
-        print(len(bv[m]), len(period[m]),
-              len(period_errs[m]))
+        pi = np.arange(len(params))
+        par_inds_mask = np.concatenate((pi[:ngyro], pi[ngyro:][m]))
+        # print(params[par_inds_mask])
         gyro_lnlike = sum(-.5*((period[m] - gyro_model(params[par_inds_mask],
                                                        bv[m]))
                                 /period_errs[m])**2)
 
     elif par_inds[0] == 3:  # If kinematics
+
+        # Mask out stars without vertical actions
         m = np.isfinite(jz)
-        kin_inds_mask = np.concatenate((np.array([par_inds[:1]]),
-                                        par_inds[nglob:][m]))
-        kin_lnlike = action_age(params[kin_inds_mask], Jz, Jz_err)
+        pi = np.arange(len(params))
+        _m = np.ones(len(params), dtype=bool)
+        _m[1:] = m
+        kin_inds_mask = pi[_m]
+        kin_lnlike = action_age(params[kin_inds_mask], jz[m], jz_err[m])
 
     # If not gyro but single stars
     else:
-        mod_inds = par_inds[0] - 3
+        mod_inds = par_inds[0] - nglob
         ms = mods[mod_inds]
         p = params*1
         p[0] = np.exp(p[0])
         p[1] = np.log10(1e9*np.exp(p[1]))
         p[3] = np.exp(p[3])
         iso_lnlike = ms.lnlike(p)
+        # print(p, "p", iso_lnlike, "iso_lnlike")
+        # assert 0
+    # print("gyro = ", gyro_lnlike, "iso = ", iso_lnlike, "kin = ", kin_lnlike)
     return gyro_lnlike + iso_lnlike + kin_lnlike
 
 
@@ -103,20 +108,22 @@ def lnprior(params, *args):
     # if gyro.
     if par_inds[0] == 0 and par_inds[1] == 1 and par_inds[2] == 2:
         g_prior = priors.lng_prior(params[:3])
+        # print(g_prior)
         age_prior = sum([np.log(priors.age_prior(np.log10(1e9*np.exp(i))))
                         for i in params[3:]])
-        feh_prior = 0.
-        distance_prior = 0.
+        feh_prior, distance_prior = 0., 0.
         mAv = True
 
     # if kinematics
-    if par_inds[0] == 3:
+    elif par_inds[0] == 3:
         age_prior = sum([np.log(priors.age_prior(np.log10(1e9*np.exp(i))))
                         for i in params[1:]])
-        if -20 < params[par_inds[0]] < 20:
-            return age_prior
-        else:
-            return -np.inf
+        g_prior, feh_prior, distance_prior = 0., 0., 0.
+        mAv = True
+        # if -20 < params[par_inds[0]] < 20:
+        #     return age_prior
+        # else:
+        #     return -np.inf
 
     # If individual stars
     else:
@@ -143,6 +150,8 @@ def lnprob(params, *args):
         args to pass to lnlike, including mods, a list of pre-computed star
         model objects.
     """
+    # print("like = ", lnlike(params, *args), "prior = ",
+          # lnprior(params, *args))
     return lnlike(params, *args) + lnprior(params, *args)
 
 
@@ -262,6 +271,8 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
         print("Gibbs iteration ", i, "of ", niter)
         print("Current parameter values = ", par)
         for k in range(len(par_inds_list)):  # loop over parameter sets.
+            print(k, "parameter set")
+            # input("enter")
             args[-1] = par_inds_list[k]
             samples, par, pb = MH(par, lnprob, nsteps, t[k],
                                                    *args)
@@ -273,8 +284,8 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
                 all_samples[nsteps*i:nsteps*(i+1), -nstars:] = \
                     samples[:, 3:]
 
-            if par_inds_list[k][0] == 3:  # save age samples separately
-                print(par_inds_list[k][3])
+            # save age samples separately: iso samples
+            if par_inds_list[k][0] == 3:
                 all_samples[nsteps*i:nsteps*(i+1), par_inds_list[k][3]] = \
                     samples[:, 0]
                 all_samples[nsteps*i:nsteps*(i+1), -nstars:] = \
@@ -282,7 +293,6 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
             else:
                 all_samples[nsteps*i:nsteps*(i+1), par_inds_list[k]] = samples
             probs.append(pb)
-
 
     lnprobs = np.array([i for j in probs for i in j])
     return all_samples, lnprobs
@@ -340,12 +350,18 @@ if __name__ == "__main__":
     global_params = np.array([.7725, .601, .5189, np.log(350.)])  # a b n beta
 
     params, mods = pars_and_mods(d, global_params)
+    print(np.exp(params[4:9]), "mass")
+    print(np.exp(params[9:14]), "age")
+    print(params[14:19], "feh")
+    print(np.exp(params[19:24]), "distance")
+    print(params[24:29], "Av")
+    input("enter")
     # params = find_optimum()
 
     start = time.time()  # timeit
 
     # Set nsteps and niter.
-    nsteps = 1000
+    nsteps = 2
     niter = 10
     N, ngyro, nglob, nind = get_n_things(mods, params)
     print(N, "stars")
@@ -429,10 +445,14 @@ if __name__ == "__main__":
             plt.ylabel(labels[i])
 
     print("Making corner plot")
-    truths = [.7725, .601, .5189, np.log(1), None, None, np.log(4.56),
-              np.log(2.5), np.log(2.5), 0., None, None, np.log(10),
-              np.log(2400), np.log(2400), 0., None, None, np.log(4.56),
-              np.log(2.5), np.log(2.5)]
+    truths = [.7725, .601, .5189, np.log(350.),
+              np.log(1), None, None, None, None,
+              np.log(4.56), np.log(2.5), np.log(2.5), None, None,
+              0., None, None, None, None,
+              np.log(10), np.log(2400), np.log(2400), None, None,
+              0., None, None, None, None,
+              np.log(4.56), np.log(2.5), np.log(2.5), None, None,
+              np.log(4.56), np.log(2.5), np.log(2.5), None, None]
     fig = corner.corner(flat, truths=truths, labels=labels)
     fig.savefig(os.path.join(RESULTS_DIR, "demo_corner_gibbs"))
 

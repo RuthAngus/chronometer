@@ -83,9 +83,9 @@ def make_param_dict(d, i):
                         d.tgas_phot_g_mean_flux_error.values[i]/
                         d.tgas_phot_g_mean_flux.values[i] *
                         d.tgas_phot_g_mean_mag.values[i]),
-                  "Teff": (d.teff.values[i], d.teff_err1.values[i]),
-                  "logg": (d.logg.values[i], d.logg_err1.values[i]),
-                  "feh": (d.feh.values[i], d.feh_err1.values[i]),
+                  # "Teff": (d.teff.values[i], d.teff_err1.values[i]),
+                  # "logg": (d.logg.values[i], d.logg_err1.values[i]),
+                  # "feh": (d.feh.values[i], d.feh_err1.values[i]),
                   "parallax": (d.tgas_parallax.values[i],
                                d.tgas_parallax_error.values[i])}  # FIXME: add more filters
     return param_dict
@@ -145,6 +145,7 @@ def pars_and_mods(d, global_params):
         # Remove missing parameters from the dict.
         param_dict = {k: param_dict[k] for k in param_dict if
                       np.isfinite(param_dict[k]).all()}
+        print(param_dict)
         mods.append(StarModel(mist, **param_dict))
     return p0, mods
 
