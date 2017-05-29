@@ -8,12 +8,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from utils import make_param_dict
 from isochrones import StarModel
-from isochrones.mist import MIST_Isochrone
 import teff_bv as tbv
 from isochrones.mist import MIST_Isochrone
 import corner
 import emcee
 import time
+import h5py
 
 plotpar = {'axes.labelsize': 18,
            'font.size': 10,
@@ -26,7 +26,7 @@ plt.rcParams.update(plotpar)
 
 def lnprob(par, mod):
     if 0 < par[0] < 100 and 0 < par[1] < 11 and -5 < par[2] < 5 and \
-            0 < par[3] < 1e3 and 0 <= par[4] < 1:
+            0 < par[3] < 1e10 and 0 <= par[4] < 1:
         return mod.lnlike(par)
     else:
         return -np.inf
@@ -47,10 +47,22 @@ def calculate_isochronal_age(df, i, RESULTS_DIR):
     p[2] = df.feh.values[i]
     p[3] = 1./(df.tgas_parallax.values[i])*1e3
     p[4] = df.Av.values[i]
+    # Replace nans
+    if not np.isfinite(p[0]):
+        p[0] = 1.
+    if not np.isfinite(p[1]):
+        p[1] = 9.
+    if not np.isfinite(p[2]):
+        p[2] = 0.
+    if not np.isfinite(p[3]):
+        p[3] = 1.
+    if not np.isfinite(p[4]):
+        p[4] = 0.
 
     mod = StarModel(mist, **param_dict)
 
-    nwalkers, nsteps, ndim, mult = 32, 500, len(p), 5
+    # Run emcee
+    nwalkers, nsteps, ndim, mult = 32, 1000, len(p), 5
     p0 = [1e-4*np.random.rand(ndim) + p for i in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=[mod])
     print("burning in...")
@@ -67,29 +79,22 @@ def calculate_isochronal_age(df, i, RESULTS_DIR):
     print("Time = ", (end - start)/60, "minutes")
     flat = np.reshape(sampler.chain, (nwalkers*nsteps*mult, ndim))
 
-    # med, _15, _85 = (10**mod.samples.age_0_0.quantile([.5, .15, .85]))*1e-9
-
-    # fig = mod.corner_physical()
-    # print(np.shape(mod.samples))
-    # print("Making corner plot")
-    # fig = corner.corner(mod.samples[-1000:, :)
-
-    # flat = np.vstack((mod.samples.mass_0_0, mod.samples.age_0_0)).T
-                      # mod.samples.feh,
-                      # mod.samples.distance,
-                      # mod.samples.AV_0_0))
+    # Plot figure
     fig = corner.corner(flat, labels=["Mass", "Age", "feh", "distance", "Av"])
     fig.savefig(os.path.join(RESULTS_DIR, "{}_corner.png".format(i)))
 
-    plt.clf()
-    plt.hist((10**mod.samples.age_0_0)*1e-9)
-    plt.xlabel("$\mathrm{Age}$")
-    plt.axvline(med)
-    plt.axvline(_15)
-    plt.axvline(_85)
-    plt.savefig(os.path.join(RESULTS_DIR, "{}_hist.png".format(i)))
+    f = h5py.File(os.path.join(RESULTS_DIR, "{}.h5".format(i)), "w")
+    data = f.create_dataset("samples", np.shape(flat))
+    data[:, :] = flat
+    f.close()
 
-    return med, med - _15, _85 - med
+    med = np.percentile(flat[:, 1], 50)
+    lower = np.percentile(flat[:, 1], 16)
+    upper = np.percentile(flat[:, 1], 84)
+    logerrp, logerrm = med - lower, upper - med
+    errp = logerrp/med * (10**med)*1e-9
+    errm = logerrm/med * (10**med)*1e-9
+    return (10**med)*1e-9, errm, errp
 
 
 def calculate_gyrochronal_ages(par, period, bv):
@@ -139,16 +144,13 @@ def loop_over_stars(df, par, number, RESULTS_DIR):
 def plot_gyro_age_against_iso_age(iso_ages, iso_errm, iso_errp, gyro_ages):
     plt.clf()
     xs = np.linspace(0, max(iso_ages), 100)
+    plt.plot(iso_ages[0], gyro_ages[0], "o", ms=20, color="w")
     plt.errorbar(iso_ages, gyro_ages, xerr=([iso_errm, iso_errp]), fmt="k.")
     plt.plot(xs, xs, ls="--")
     plt.xlabel("$\mathrm{Isochronal~age~(Gyr)}$")
     plt.ylabel("$\mathrm{Gyrochronal~age~(Gyr)}$")
     plt.subplots_adjust(bottom=0.15)
     plt.savefig("iso_vs_gyro.pdf")
-
-
-def save_results():
-    return
 
 
 if __name__ == "__main__":
@@ -160,6 +162,6 @@ if __name__ == "__main__":
     df = pd.read_csv(os.path.join(DATA_DIR, "action_data.csv"))
 
     par = np.array([.7725, .60, .4, .5189])
-    iso_ages, iso_errm, iso_errp, gyro_ages = loop_over_stars(df, par, 1,
+    iso_ages, iso_errm, iso_errp, gyro_ages = loop_over_stars(df, par, 10,
                                                               RESULTS_DIR)
     plot_gyro_age_against_iso_age(iso_ages, iso_errm, iso_errp, gyro_ages)
