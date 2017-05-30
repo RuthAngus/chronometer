@@ -60,16 +60,12 @@ def lnlike(params, *args):
     N, ngyro, nglob, nind = get_n_things(mods, params)
     gyro_lnlike, iso_lnlike, kin_lnlike = 0, 0, 0
     if par_inds[0] == 0 and par_inds[1] == 1 and par_inds[2] == 2: # if gyro.
-        # r = np.isfinite(period)
-        # r_period, r_period_errs, r_bv = period[r], period_errs[r], bv[r]
-        # gyro_lnlike = sum(-.5*((r_period - gyro_model(params, r_bv))
-                                # /r_period_errs)**2)
 
         # Mask out stars without periods
         m = (bv > .4) * (np.isfinite(period))
         pi = np.arange(len(params))
         par_inds_mask = np.concatenate((pi[:ngyro], pi[ngyro:][m]))
-        # print(params[par_inds_mask])
+
         gyro_lnlike = sum(-.5*((period[m] - gyro_model(params[par_inds_mask],
                                                        bv[m]))
                                 /period_errs[m])**2)
@@ -93,9 +89,13 @@ def lnlike(params, *args):
         p[1] = np.log10(1e9*np.exp(p[1]))
         p[3] = np.exp(p[3])
         iso_lnlike = ms.lnlike(p)
-        # print(p, "p", iso_lnlike, "iso_lnlike")
-        # assert 0
-    # print("gyro = ", gyro_lnlike, "iso = ", iso_lnlike, "kin = ", kin_lnlike)
+        if mod_inds == 4:
+            print(mods[mod_inds])
+            print(mod_inds, "mod_inds")
+            print(iso_lnlike, "iso_lnlike")
+            print(p, "params")
+            input("enter")
+
     return gyro_lnlike + iso_lnlike + kin_lnlike
 
 
@@ -108,32 +108,25 @@ def lnprior(params, *args):
     # if gyro.
     if par_inds[0] == 0 and par_inds[1] == 1 and par_inds[2] == 2:
         g_prior = priors.lng_prior(params[:3])
-        # print(g_prior)
         age_prior = sum([np.log(priors.age_prior(np.log10(1e9*np.exp(i))))
                         for i in params[3:]])
-        feh_prior, distance_prior = 0., 0.
-        mAv = True
+        feh_prior, distance_prior, mAv = 0., 0., True
 
     # if kinematics
     elif par_inds[0] == 3:
         age_prior = sum([np.log(priors.age_prior(np.log10(1e9*np.exp(i))))
                         for i in params[1:]])
-        g_prior, feh_prior, distance_prior = 0., 0., 0.
-        mAv = True
-        # if -20 < params[par_inds[0]] < 20:
-        #     return age_prior
-        # else:
-        #     return -np.inf
+        g_prior, feh_prior, distance_prior, mAv = 0., 0., 0., True
 
     # If individual stars
-    else:
+    elif par_inds[0] > 3:
         g_prior = 0.
         age_prior = np.log(priors.age_prior(np.log10(1e9*np.exp(params[1]))))
         feh_prior = np.log(priors.feh_prior(params[2]))
         distance_prior = np.log(priors.distance_prior(np.exp(params[3])))
         mAv = (0 <= params[4]) * (params[4] < 1)  # Prior on A_v
 
-    m = (-20 < params) * (params < 20)  # Broad bounds on all params.
+    m = (-20 < params) * (params < 20)  # Broad bounds on all (log) params.
 
     if sum(m) == len(m) and mAv:
         return g_prior + age_prior + feh_prior + distance_prior
@@ -210,6 +203,7 @@ def MH_step(par, lnprob, t, *args, emc=False):
         sampler.run_mcmc(p0, 10)
         return sampler.chain[0][-1], sampler.lnprobability.T[-1, 0], 0
     newp = par + np.random.multivariate_normal(np.zeros((len(par))), t)
+    newp = par  # FIXME
     new_lnprob = lnprob(newp, *args)
     alpha = np.exp(new_lnprob - lnprob(par, *args))
     if alpha > 1:

@@ -59,6 +59,9 @@ def emcee_lnprob(params, *args):
     p[nglob+3*N:nglob+4*N] = np.exp(p[nglob+3*N:nglob+4*N])  # dist
     iso_lnlike = sum([mods[i].lnlike(p[nglob+i::N]) for i in
                       range(len(mods))])
+    print(mods[4].lnlike(p[nglob+4::N]), "iso_lnlike")
+    print(p[nglob+4::N], "params")
+    input("enter")
     return gyro_lnlike + iso_lnlike + kin_lnlike + \
         emcee_lnprior(params, *args)
     # return gyro_lnlike + emcee_lnprior(params, *args)
@@ -119,7 +122,8 @@ if __name__ == "__main__":
                   d.Jz_err, N, ngyro, nglob, nind, g_par_inds_mask, kin_inds,
                   m]
     nwalkers, nsteps, ndim, mult = 64, 10000, len(params), 5
-    p0 = [1e-4*np.random.rand(ndim) + params for i in range(nwalkers)]
+    np.random.seed(1234)
+    p0 = [1e-20*np.random.rand(ndim) + params for i in range(nwalkers)]  # FIXME
     sampler = emcee.EnsembleSampler(nwalkers, ndim, emcee_lnprob,
                                     args=emcee_args)
     print("burning in...")
