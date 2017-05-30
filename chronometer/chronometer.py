@@ -89,12 +89,6 @@ def lnlike(params, *args):
         p[1] = np.log10(1e9*np.exp(p[1]))
         p[3] = np.exp(p[3])
         iso_lnlike = ms.lnlike(p)
-        if mod_inds == 4:
-            print(mods[mod_inds])
-            print(mod_inds, "mod_inds")
-            print(iso_lnlike, "iso_lnlike")
-            print(p, "params")
-            input("enter")
 
     return gyro_lnlike + iso_lnlike + kin_lnlike
 
@@ -125,6 +119,11 @@ def lnprior(params, *args):
         feh_prior = np.log(priors.feh_prior(params[2]))
         distance_prior = np.log(priors.distance_prior(np.exp(params[3])))
         mAv = (0 <= params[4]) * (params[4] < 1)  # Prior on A_v
+
+        print(age_prior, "age_prior", params[1])
+        print(feh_prior, "feh_prior", params[2])
+        print(distance_prior, "distance_prior", params[3])
+        input("enter")
 
     m = (-20 < params) * (params < 20)  # Broad bounds on all (log) params.
 
@@ -266,7 +265,6 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
         print("Current parameter values = ", par)
         for k in range(len(par_inds_list)):  # loop over parameter sets.
             print(k, "parameter set")
-            # input("enter")
             args[-1] = par_inds_list[k]
             samples, par, pb = MH(par, lnprob, nsteps, t[k],
                                                    *args)
@@ -349,7 +347,6 @@ if __name__ == "__main__":
     print(params[14:19], "feh")
     print(np.exp(params[19:24]), "distance")
     print(params[24:29], "Av")
-    input("enter")
     # params = find_optimum()
 
     start = time.time()  # timeit
