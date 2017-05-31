@@ -76,14 +76,6 @@ def emcee_lnprior(params, *args):
     distance_prior = sum(np.log(priors.distance_prior(
                             np.exp(params[nglob+3*N:nglob+4*N]))))
 
-    age_prior = np.log(priors.age_prior(np.log10(1e9*np.exp(params[9]))))
-    feh_prior = np.log(priors.feh_prior(params[14]))
-    distance_prior = np.log(priors.distance_prior(np.exp(params[19])))
-    print(age_prior, "age_prior", params[9])
-    print(feh_prior, "feh_prior", params[14])
-    print(distance_prior, "distance_prior", params[19])
-    input("enter")
-
     mAv = (0 <= params[nglob+4*N:nglob+5*N]) * \
         (params[nglob+4*N:nglob+5*N] < 1)  # Prior on A_v
     m = (-20 < params) * (params < 20)  # Broad bounds on all params.
@@ -129,7 +121,7 @@ if __name__ == "__main__":
                   m]
     nwalkers, nsteps, ndim, mult = 64, 10000, len(params), 5
     np.random.seed(1234)
-    p0 = [0*np.random.rand(ndim) + params for i in range(nwalkers)]  # FIXME
+    p0 = [1e-4*np.random.rand(ndim) + params for i in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, emcee_lnprob,
                                     args=emcee_args)
     print("burning in...")
