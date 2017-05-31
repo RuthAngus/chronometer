@@ -120,11 +120,6 @@ def lnprior(params, *args):
         distance_prior = np.log(priors.distance_prior(np.exp(params[3])))
         mAv = (0 <= params[4]) * (params[4] < 1)  # Prior on A_v
 
-        print(age_prior, "age_prior", params[1])
-        print(feh_prior, "feh_prior", params[2])
-        print(distance_prior, "distance_prior", params[3])
-        input("enter")
-
     m = (-20 < params) * (params < 20)  # Broad bounds on all (log) params.
 
     if sum(m) == len(m) and mAv:
@@ -201,8 +196,8 @@ def MH_step(par, lnprob, t, *args, emc=False):
         sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=args)
         sampler.run_mcmc(p0, 10)
         return sampler.chain[0][-1], sampler.lnprobability.T[-1, 0], 0
-    newp = par + np.random.multivariate_normal(np.zeros((len(par))), t)
-    newp = par  # FIXME
+    # newp = par + np.random.multivariate_normal(np.zeros((len(par))), t)
+    newp = par + np.random.multivariate_normal(np.zeros((len(par))), (t*0 + .01))
     new_lnprob = lnprob(newp, *args)
     alpha = np.exp(new_lnprob - lnprob(par, *args))
     if alpha > 1:
@@ -323,7 +318,7 @@ def find_optimum():
     """
     Return the median of the emcee samples.
     """
-    with h5py.File("emcee_posterior_samples.h5", "r") as f:
+    with h5py.File("emcee_posterior_samples_0525.h5", "r") as f:
         samples = f["action_samples"][...]
     ndim = np.shape(samples)[1]
     return np.array([np.median(samples[:, i]) for i in range(ndim)])
@@ -352,7 +347,7 @@ if __name__ == "__main__":
     start = time.time()  # timeit
 
     # Set nsteps and niter.
-    nsteps = 2
+    nsteps = 1000
     niter = 10
     N, ngyro, nglob, nind = get_n_things(mods, params)
     print(N, "stars")
@@ -370,11 +365,15 @@ if __name__ == "__main__":
     # Create the covariance matrices.
     t = estimate_covariance(N)
     ts = []
-    for i, par_ind in enumerate(par_inds_list):
-        ti = np.zeros((len(par_ind), len(par_ind)))
-        for j, ind in enumerate(par_ind):
-            ti[j] = t[ind][par_ind]
+    for i, par_ind in enumerate(par_inds_list):  # For each set of pars:
+        ti = np.zeros((len(par_ind), len(par_ind)))  # Make array of that shape
+        for j, ind in enumerate(par_ind):  # For each index
+            ti[j] = t[ind][par_ind]  # Fill array with those covariances.
         ts.append(ti)
+
+    print(ts[-1])
+    print(ts[-2])
+    input("enter")
 
     # Sample posteriors using MH gibbs
     args = [mods, d.prot.values, d.prot_err.values, d.bv.values,
@@ -445,7 +444,7 @@ if __name__ == "__main__":
               np.log(4.56), np.log(2.5), np.log(2.5), None, None,
               np.log(4.56), np.log(2.5), np.log(2.5), None, None]
     fig = corner.corner(flat, truths=truths, labels=labels)
-    fig.savefig(os.path.join(RESULTS_DIR, "demo_corner_gibbs"))
+    fig.savefig(os.path.join(RESULTS_DIR, "full_corner_gibbs"))
 
     f = h5py.File(os.path.join(RESULTS_DIR, "samples.h5"), "w")
     data = f.create_dataset("samples", np.shape(flat))
