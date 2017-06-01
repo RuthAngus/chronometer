@@ -110,9 +110,14 @@ def loop_over_stars(df, par, number, RESULTS_DIR):
     Calculate gyro and iso ages for each star.
     Return lists of ages and uncertainties.
     """
-    periods, teffs = df.prot.values[:number], df.teff.values[:number]
-    fehs, loggs = df.feh.values[:number], df.logg.values[:number]
-    bvs = tbv.teff2bv(teffs, loggs, fehs)
+    try:
+        bvs = df.bv.values
+    except:
+        teffs = df.teff.values[:number]
+        fehs, loggs = df.feh.values[:number], df.logg.values[:number]
+        bvs = tbv.teff2bv(teffs, loggs, fehs)
+
+    periods = df.prot.values[:number]
     gyro_age = calculate_gyrochronal_ages(par, periods, bvs)
     iso_ages, iso_errm, iso_errp, gyro_ages = [], [], [], []
     for i, star in enumerate(df.jmag.values[:number]):
@@ -123,16 +128,16 @@ def loop_over_stars(df, par, number, RESULTS_DIR):
             # Check whether an age exists already
             fn = os.path.join(RESULTS_DIR, "{}.h5".format(i))
 
-            # if os.path.exists(fn):
-            #     d = pd.read_csv(fn)
-            #     age, age_errm, age_errp = d.age.values, d.age_errm.values, \
-            #         d.age_errp.values
-            # else:
-            age, age_errm, age_errp = \
-                calculate_isochronal_age(df, i, RESULTS_DIR)
-            d = pd.DataFrame({"age": [age], "age_errm": [age_errm],
-                                "age_errp": [age_errp]})
-            d.to_csv(fn)
+            if os.path.exists(fn):
+                d = pd.read_csv(fn)
+                age, age_errm, age_errp = d.age.values, d.age_errm.values, \
+                    d.age_errp.values
+            else:
+                age, age_errm, age_errp = \
+                    calculate_isochronal_age(df, i, RESULTS_DIR)
+                d = pd.DataFrame({"age": [age], "age_errm": [age_errm],
+                                    "age_errp": [age_errp]})
+                d.to_csv(fn)
 
             iso_ages.append(age)
             iso_errm.append(age_errm)
@@ -159,9 +164,10 @@ if __name__ == "__main__":
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
     RESULTS_DIR = "/Users/ruthangus/projects/chronometer/chronometer/iso_ages"
     # df = pd.read_csv(os.path.join(DATA_DIR, "kplr_tgas_periods.csv"))
-    df = pd.read_csv(os.path.join(DATA_DIR, "action_data.csv"))
+    # df = pd.read_csv(os.path.join(DATA_DIR, "action_data.csv"))
+    df = pd.read_csv(os.path.join(DATA_DIR, "fake_data.csv"))
 
     par = np.array([.7725, .60, .4, .5189])
-    iso_ages, iso_errm, iso_errp, gyro_ages = loop_over_stars(df, par, 10,
+    iso_ages, iso_errm, iso_errp, gyro_ages = loop_over_stars(df, par, 100,
                                                               RESULTS_DIR)
     plot_gyro_age_against_iso_age(iso_ages, iso_errm, iso_errp, gyro_ages)
