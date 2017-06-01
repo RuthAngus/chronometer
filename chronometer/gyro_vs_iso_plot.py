@@ -14,6 +14,7 @@ import corner
 import emcee
 import time
 import h5py
+import priors
 
 plotpar = {'axes.labelsize': 18,
            'font.size': 10,
@@ -24,29 +25,38 @@ plotpar = {'axes.labelsize': 18,
 plt.rcParams.update(plotpar)
 
 
+def lnprior(par):
+    age_prior = np.log(priors.age_prior(par[1]))
+    feh_prior = np.log(priors.feh_prior(par[2]))
+    distance_prior = np.log(priors.distance_prior(np.exp(par[3])))
+    return age_prior + feh_prior + distance_prior
+
+
 def lnprob(par, mod):
     if 0 < par[0] < 100 and 0 < par[1] < 11 and -5 < par[2] < 5 and \
             0 < par[3] < 1e10 and 0 <= par[4] < 1:
-        return mod.lnlike(par)
+        prob = mod.lnlike(par) + lnprior(par)
+        if np.isfinite(prob):
+            return prob
+        else:
+            return -np.inf
     else:
         return -np.inf
 
 
-def calculate_isochronal_age(df, i, RESULTS_DIR):
+def calculate_isochronal_age(param_dict, i, RESULTS_DIR):
     """
     Do the MCMC using isochrones.py
     """
     mist = MIST_Isochrone()
-    param_dict = make_param_dict(df, i)
-    param_dict = {k: param_dict[k] for k in param_dict if
-                    np.isfinite(param_dict[k]).all()}
 
+    # Initial values
     p = np.zeros(5)
-    p[0] = df.mass.values[i]
-    p[1] = np.log10(1e9*df.age.values[i])
-    p[2] = df.feh.values[i]
-    p[3] = 1./(df.tgas_parallax.values[i])*1e3
-    p[4] = df.Av.values[i]
+    p[0] = 1.  # df.mass.values[i]
+    p[1] = 9.  # np.log10(1e9*df.age.values[i])
+    p[2] = 0.  # df.feh.values[i]
+    p[3] = 100. # 1./(df.tgas_parallax.values[i])*1e3
+    p[4] = 0.  # df.Av.values[i]
     # Replace nans
     if not np.isfinite(p[0]):
         p[0] = 1.
@@ -91,10 +101,10 @@ def calculate_isochronal_age(df, i, RESULTS_DIR):
     med = np.percentile(flat[:, 1], 50)
     lower = np.percentile(flat[:, 1], 16)
     upper = np.percentile(flat[:, 1], 84)
-    logerrp, logerrm = med - lower, upper - med
+    logerrm, logerrp = med - lower, upper - med
     errp = logerrp/med * (10**med)*1e-9
     errm = logerrm/med * (10**med)*1e-9
-    return (10**med)*1e-9, errm, errp
+    return (10**med)*1e-9, errm, errp, flat[:, 1]
 
 
 def calculate_gyrochronal_ages(par, period, bv):
@@ -119,6 +129,8 @@ def loop_over_stars(df, par, number, RESULTS_DIR):
 
     periods = df.prot.values[:number]
     gyro_age = calculate_gyrochronal_ages(par, periods, bvs)
+    print(gyro_age)
+
     iso_ages, iso_errm, iso_errp, gyro_ages = [], [], [], []
     for i, star in enumerate(df.jmag.values[:number]):
         if df.prot.values[i] > 0.:
@@ -133,8 +145,12 @@ def loop_over_stars(df, par, number, RESULTS_DIR):
                 age, age_errm, age_errp = d.age.values, d.age_errm.values, \
                     d.age_errp.values
             else:
-                age, age_errm, age_errp = \
-                    calculate_isochronal_age(df, i, RESULTS_DIR)
+                param_dict = make_param_dict(df, i)
+                param_dict = {k: param_dict[k] for k in param_dict if
+                                np.isfinite(param_dict[k]).all()}
+
+                age, age_errm, age_errp, samps = \
+                    calculate_isochronal_age(param_dict, i, RESULTS_DIR)
                 d = pd.DataFrame({"age": [age], "age_errm": [age_errm],
                                     "age_errp": [age_errp]})
                 d.to_csv(fn)
@@ -147,13 +163,17 @@ def loop_over_stars(df, par, number, RESULTS_DIR):
 
 
 def plot_gyro_age_against_iso_age(iso_ages, iso_errm, iso_errp, gyro_ages):
+    ages = np.array([3.5, 6.5, 1., 10, 4.5])
+    xs = np.linspace(0, max(ages), 100)
+
     plt.clf()
-    xs = np.linspace(0, max(iso_ages), 100)
-    plt.plot(iso_ages[0], gyro_ages[0], "o", ms=20, color="w")
-    plt.errorbar(iso_ages, gyro_ages, xerr=([iso_errm, iso_errp]), fmt="k.")
     plt.plot(xs, xs, ls="--")
-    plt.xlabel("$\mathrm{Isochronal~age~(Gyr)}$")
-    plt.ylabel("$\mathrm{Gyrochronal~age~(Gyr)}$")
+    plt.plot(ages, gyro_ages, ".", label="Gyro")
+    plt.errorbar(ages, iso_ages, yerr=([iso_errm, iso_errp]), fmt="k.",
+                 label="iso")
+    plt.legend()
+    plt.xlabel("$\mathrm{True~age~(Gyr)}$")
+    plt.ylabel("$\mathrm{Inferred~age~(Gyr)}$")
     plt.subplots_adjust(bottom=0.15)
     plt.savefig("iso_vs_gyro.pdf")
 
