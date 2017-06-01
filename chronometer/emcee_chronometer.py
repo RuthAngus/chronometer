@@ -93,7 +93,8 @@ if __name__ == "__main__":
 
     # Load the data for the initial parameter array.
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
-    d = pd.read_csv(os.path.join(DATA_DIR, "action_data.csv"))
+    # d = pd.read_csv(os.path.join(DATA_DIR, "action_data.csv"))
+    d = pd.read_csv(os.path.join(DATA_DIR, "fake_action_data.csv"))
 
     # Generate the initial parameter array and the mods objects from the data
     global_params = np.array([.7725, .601, .5189, np.log(350.)])  # a b n beta
@@ -119,7 +120,7 @@ if __name__ == "__main__":
                   d.prot_err.values, d.bv.values, d.bv_err.values, d.Jz,
                   d.Jz_err, N, ngyro, nglob, nind, g_par_inds_mask, kin_inds,
                   m]
-    nwalkers, nsteps, ndim, mult = 64, 10000, len(params), 5
+    nwalkers, nsteps, ndim, mult = 64, 1000, len(params), 5
     np.random.seed(1234)
     p0 = [1e-4*np.random.rand(ndim) + params for i in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, emcee_lnprob,

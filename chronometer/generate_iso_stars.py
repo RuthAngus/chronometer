@@ -40,13 +40,14 @@ if __name__ == "__main__":
     masses = np.array([.9, .95, 1., 1.05, 1.1])
     ages = np.array([np.log10(3.5e9), np.log10(6.5e9), np.log10(1e9),
                      np.log10(10e9), np.log10(4.5e9)])
+    print(ages, "ages")
     fehs = np.array([-.2, -.05, 0., .1, -.1])
     distances = np.array([300, 200, 500, 400, 100])
     Avs = np.array([.2, .1, 0., .05, .15])
 
     B, V, J, H, K = star_colors(masses, ages, fehs, distances, Avs)
-    periods = age2period(par, ages, B-V)
-    errs = [np.zeros(len(B)) for i in range(5)]
+    periods = age2period(par, (10**ages)*1e-9, B-V)
+    errs = [np.ones(len(B))*.01 for i in range(5)]
 
     dictionary = pd.DataFrame({"bv": B-V, "jmag": J, "jmag_err": errs[0],
                                "kmag": K, "kmag_err": errs[1], "hmag": H,
