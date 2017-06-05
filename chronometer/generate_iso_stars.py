@@ -3,6 +3,7 @@ This code generates the properties of fake stars.
 """
 
 import numpy as np
+import matplotlib.pyplot as plt
 import pandas as pd
 from isochrones.mist import MIST_Isochrone
 mist = MIST_Isochrone()
@@ -56,9 +57,17 @@ if __name__ == "__main__":
                            "distance": distances, "Av": Avs})
     truths.to_csv("truths.txt")
 
-    B, V, J, H, K = star_colors(masses, ages, fehs, distances, Avs)
-    periods = age2period(par, (10**ages)*1e-9, B-V)
+    B, V, J, H, K = star_colors(masses, np.log10(ages*1e9), fehs, distances,
+                                Avs)
+    periods = age2period(par, ages, B-V)
     errs = [np.ones(len(B))*.01 for i in range(5)]
+
+    # plt.clf()
+    # # plt.hist(ages)
+    # plt.plot(ages, periods, "k.")
+    # bv = np.ones_like(ages)*.65
+    # plt.plot(ages, age2period(par, ages, bv))
+    # plt.savefig("period_model")
 
     beta = 350.
     Jz = [np.random.normal(0, beta * i, 1) for i in ages]
