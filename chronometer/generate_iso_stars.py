@@ -37,23 +37,40 @@ def star_colors(masses, ages, fehs, distances, Avs):
 if __name__ == "__main__":
     par = np.array([.7725, .60, .4, .5189])
 
-    masses = np.array([.9, .95, 1., 1.05, 1.1])
-    ages = np.array([np.log10(3.5e9), np.log10(6.5e9), np.log10(1e9),
-                     np.log10(10e9), np.log10(4.5e9)])
-    print(ages, "ages")
-    fehs = np.array([-.2, -.05, 0., .1, -.1])
-    distances = np.array([300, 200, 500, 400, 100])
-    Avs = np.array([.2, .1, 0., .05, .15])
+    # masses = np.array([.9, .95, 1., 1.05, 1.1])
+    # ages = np.array([np.log10(3.5e9), np.log10(6.5e9), np.log10(1e9),
+    #                  np.log10(10e9), np.log10(4.5e9)])
+    # print(ages, "ages")
+    # fehs = np.array([-.2, -.05, 0., .1, -.1])
+    # distances = np.array([300, 200, 500, 400, 100])
+    # Avs = np.array([.2, .1, 0., .05, .15])
+
+    N = 1000
+    masses = np.random.uniform(.7, 1.2, N)
+    ages = np.random.uniform(1, 10, N)
+    fehs = np.random.randn(N) * .3
+    distances = np.random.uniform(50, 1000, N)
+    Avs = np.abs(np.random.randn(N) * .1)
+
+    truths = pd.DataFrame({"mass": masses, "age": ages, "feh": fehs,
+                           "distance": distances, "Av": Avs})
+    truths.to_csv("truths.txt")
 
     B, V, J, H, K = star_colors(masses, ages, fehs, distances, Avs)
     periods = age2period(par, (10**ages)*1e-9, B-V)
     errs = [np.ones(len(B))*.01 for i in range(5)]
 
-    dictionary = pd.DataFrame({"bv": B-V, "jmag": J, "jmag_err": errs[0],
-                               "kmag": K, "kmag_err": errs[1], "hmag": H,
-                               "hmag_err": errs[2], "prot": periods,
+    beta = 350.
+    Jz = [np.random.normal(0, beta * i, 1) for i in ages]
+    Jz = np.array([i for j in Jz for i in j])
+    Jz_err = np.ones_like(Jz) * 10
+
+    dictionary = pd.DataFrame({"bv": B-V, "bv_err": errs[0], "jmag": J,
+                               "jmag_err": errs[1],
+                               "kmag": K, "kmag_err": errs[2], "hmag": H,
+                               "hmag_err": errs[3], "prot": periods,
                                "prot_err": periods*.1, "tgas_parallax":
                                (1./distances)*1e3, "tgas_parallax_error":
-                               np.ones(len(B))})
+                               np.ones(len(B)), "Jz": Jz, "Jz_err": Jz_err})
 
     dictionary.to_csv("data/fake_data.csv")
