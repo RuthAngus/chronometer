@@ -324,7 +324,34 @@ def find_optimum():
     return np.array([np.median(samples[:, i]) for i in range(ndim)])
 
 
+def augment(cov, N, npar):
+    """
+    Add the required number of parameters on to the covariance matrix.
+    Repeat the individual star covariances for the last star N times.
+    params:
+    ------
+    cov: (array)
+        A 2d array of parameter covariances.
+    N: (int)
+        The number of stars to add on.
+    npar: (int)
+        The number of parameters per star.
+    """
+    for i in range(N):
+        new_col = cov[:, -npar:]  # select last npar columns.
+        aug_col = np.hstack((cov, new_col))  # Attach them to cov
+        new_row = np.hstack((cov[-npar:, :], cov[-npar:, -npar:]))  # new row
+        cov = np.vstack((aug_col, new_row))  # attach new row to cov.
+    return cov
+
+
 if __name__ == "__main__":
+
+    cov = np.vstack((np.array([1, 2, 3, 4, 5]), np.array([1, 2, 3, 4, 5]),
+                    np.array([1, 2, 3, 4, 5]), np.array([1, 2, 3, 4, 5]),
+                    np.array([1, 2, 3, 4, 5])))
+    augment(cov, 2, 3)
+    assert 0
 
     RESULTS_DIR = "/Users/ruthangus/projects/chronometer/chronometer/MH"
 
