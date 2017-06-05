@@ -109,17 +109,21 @@ def MH(par, lnprob, nsteps, niter, t, *args):
                     "$A_{v4}$", "$A_{v5}$"]
 
     accept, probs = 0, []
+    accept_list = [[] for i in range(len(par))]
     for k in range(niter):  # loop over iterations
         if (k + 1) % 100 == 0:
             print("iteration", k + 1, "of", niter)
+            print("Acceptance fraction = ", accept/(k*nsteps*len(par)))
         for j in range(len(par)):  # loop over parameters
-            accept = 0
             for i in range(nsteps):  # Do the MCMC
                 par, new_prob, acc = MH_step(par, lnprob, j, t, *args)
                 accept += acc
+                accept_list[j].append(acc)
                 probs.append(new_prob)
                 samples[i + j*nsteps + k*len(par)*nsteps, :] = par
-            # print("Acceptance fraction = ", accept/float(nsteps))
+
+    for i, l in enumerate(accept_list):
+        print("param", i, sum(l)/(niter*nsteps))
     return samples, par, probs
 
 
@@ -166,7 +170,7 @@ if __name__ == "__main__":
 
     # Set nsteps and niter.
     nsteps = 1
-    niter = 50000
+    niter = 10000
     N, ngyro, nglob, nind = get_n_things(mods, params)
     print(N, "stars")
 

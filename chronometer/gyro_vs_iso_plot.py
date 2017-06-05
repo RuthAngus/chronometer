@@ -72,7 +72,7 @@ def calculate_isochronal_age(param_dict, i, RESULTS_DIR):
     mod = StarModel(mist, **param_dict)
 
     # Run emcee
-    nwalkers, nsteps, ndim, mult = 32, 1000, len(p), 5
+    nwalkers, nsteps, ndim, mult = 32, 5000, len(p), 5
     p0 = [1e-4*np.random.rand(ndim) + p for i in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=[mod])
     print("burning in...")
@@ -90,6 +90,7 @@ def calculate_isochronal_age(param_dict, i, RESULTS_DIR):
     flat = np.reshape(sampler.chain, (nwalkers*nsteps*mult, ndim))
 
     # Plot figure
+    flat[:, 1] = 10**(flat[:, 1])*1e-9
     fig = corner.corner(flat, labels=["Mass", "Age", "feh", "distance", "Av"])
     fig.savefig(os.path.join(RESULTS_DIR, "{}_corner.png".format(i)))
 
@@ -106,8 +107,8 @@ def calculate_isochronal_age(param_dict, i, RESULTS_DIR):
     errm = logerrm/med * (10**med)*1e-9
     return (10**med)*1e-9, errm, errp, flat[:, 1]
 
-
 def calculate_gyrochronal_ages(par, period, bv):
+
     """
     The gyro model.
     """
@@ -115,7 +116,7 @@ def calculate_gyrochronal_ages(par, period, bv):
     return (period / (a*(bv - c)**b))**(1./n) * 1e-3
 
 
-def loop_over_stars(df, par, number, RESULTS_DIR):
+def loop_over_stars(df, par, number, RESULTS_DIR, clobber=False):
     """
     Calculate gyro and iso ages for each star.
     Return lists of ages and uncertainties.
@@ -129,22 +130,20 @@ def loop_over_stars(df, par, number, RESULTS_DIR):
 
     periods = df.prot.values[:number]
     gyro_age = calculate_gyrochronal_ages(par, periods, bvs)
+    print(periods)
+    print(bvs)
     print(gyro_age)
 
     iso_ages, iso_errm, iso_errp, gyro_ages = [], [], [], []
     for i, star in enumerate(df.jmag.values[:number]):
-        if df.prot.values[i] > 0.:
+        if df.prot.values[i] > 0. and bvs[i] > .4:
             print("Calculating iso age for ", i, "of",
                 len(df.jmag.values[:number]), "...")
 
             # Check whether an age exists already
             fn = os.path.join(RESULTS_DIR, "{}.h5".format(i))
 
-            if os.path.exists(fn):
-                d = pd.read_csv(fn)
-                age, age_errm, age_errp = d.age.values, d.age_errm.values, \
-                    d.age_errp.values
-            else:
+            if clobber:
                 param_dict = make_param_dict(df, i)
                 param_dict = {k: param_dict[k] for k in param_dict if
                                 np.isfinite(param_dict[k]).all()}
@@ -154,6 +153,21 @@ def loop_over_stars(df, par, number, RESULTS_DIR):
                 d = pd.DataFrame({"age": [age], "age_errm": [age_errm],
                                     "age_errp": [age_errp]})
                 d.to_csv(fn)
+            else:
+                if os.path.exists(fn):
+                    d = pd.read_csv(fn)
+                    age, age_errm, age_errp = d.age.values, \
+                        d.age_errm.values, d.age_errp.values
+                else:
+                    param_dict = make_param_dict(df, i)
+                    param_dict = {k: param_dict[k] for k in param_dict if
+                                    np.isfinite(param_dict[k]).all()}
+
+                    age, age_errm, age_errp, samps = \
+                        calculate_isochronal_age(param_dict, i, RESULTS_DIR)
+                    d = pd.DataFrame({"age": [age], "age_errm": [age_errm],
+                                        "age_errp": [age_errp]})
+                    d.to_csv(fn)
 
             iso_ages.append(age)
             iso_errm.append(age_errm)
@@ -162,32 +176,35 @@ def loop_over_stars(df, par, number, RESULTS_DIR):
     return iso_ages, iso_errm, iso_errp, gyro_ages
 
 
-def plot_gyro_age_against_iso_age(iso_ages, iso_errm, iso_errp, gyro_ages):
-    ages = np.array([3.5, 6.5, 1., 10, 4.5])
-    xs = np.linspace(0, max(ages), 100)
+def plot_gyro_age_against_iso_age(iso_ages, iso_errm, iso_errp, gyro_ages,
+                                  fn):
+    # ages = np.array([3.5, 6.5, 1., 10, 4.5])
+    xs = np.linspace(0, max(iso_ages), 100)
 
     plt.clf()
     plt.plot(xs, xs, ls="--")
-    plt.plot(ages, gyro_ages, ".", label="Gyro")
-    plt.errorbar(ages, iso_ages, yerr=([iso_errm, iso_errp]), fmt="k.",
-                 label="iso")
-    plt.legend()
-    plt.xlabel("$\mathrm{True~age~(Gyr)}$")
-    plt.ylabel("$\mathrm{Inferred~age~(Gyr)}$")
+    plt.errorbar(gyro_ages, iso_ages, yerr=([iso_errm, iso_errp]), fmt="k.")
+    plt.xlabel("$\mathrm{Gyrochronal~age~(Gyr)}$")
+    plt.ylabel("$\mathrm{Isochronal~age~(Gyr)}$")
     plt.subplots_adjust(bottom=0.15)
-    plt.savefig("iso_vs_gyro.pdf")
+    plt.savefig(os.path.join(RESULTS_DIR, fn))
 
 
 if __name__ == "__main__":
 
     # Preamble.
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
-    RESULTS_DIR = "/Users/ruthangus/projects/chronometer/chronometer/iso_ages"
+    # RESULTS_DIR = "/Users/ruthangus/projects/chronometer/chronometer/iso_ages"
+    RESULTS_DIR = "/Users/ruthangus/projects/chronometer/chronometer/"\
+        "fake_iso_ages"
     # df = pd.read_csv(os.path.join(DATA_DIR, "kplr_tgas_periods.csv"))
     # df = pd.read_csv(os.path.join(DATA_DIR, "action_data.csv"))
     df = pd.read_csv(os.path.join(DATA_DIR, "fake_data.csv"))
 
     par = np.array([.7725, .60, .4, .5189])
     iso_ages, iso_errm, iso_errp, gyro_ages = loop_over_stars(df, par, 100,
-                                                              RESULTS_DIR)
-    plot_gyro_age_against_iso_age(iso_ages, iso_errm, iso_errp, gyro_ages)
+                                                              RESULTS_DIR,
+                                                              clobber=False)
+    plot_gyro_age_against_iso_age(iso_ages, iso_errm, iso_errp, gyro_ages,
+                                  "fake_data")
+                                  # "real_data_more")

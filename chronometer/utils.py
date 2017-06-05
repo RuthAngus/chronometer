@@ -39,15 +39,30 @@ def replace_nans_with_inits(d):
     If no initial Av is provided, initialise with 0.
     """
 
-    mass = mask_column(d, d.mass.values, 1.)
+    try:
+        mass = mask_column(d, d.mass.values, 1.)
+    except:
+        mass = np.ones(len(d))
     d["mass"] = mass
-    feh = mask_column(d, d.feh.values, 0.)
+    try:
+        feh = mask_column(d, d.feh.values, 0.)
+    except:
+        feh = np.zeros(len(d))
     d["feh"] = feh
-    Av = mask_column(d, d.Av.values, 0.)
+    try:
+        Av = mask_column(d, d.Av.values, 0.)
+    except:
+        Av = np.zeros(len(d))
     d["Av"] = Av
-    tgas_parallax = mask_column(d, d.tgas_parallax.values, 0.)
-    d["tgas_parallax"] = tgas_parallax
-    age = mask_column(d, d.age.values, np.log(2))
+    try:
+        parallax = mask_column(d, d.tgas_parallax.values, .1)
+    except:
+        parallax = np.ones(len(d)) * .1
+    d["tgas_parallax"] = parallax
+    try:
+        age = mask_column(d, d.age.values, np.log(2))
+    except:
+        age = np.ones(len(d)) * np.log(2)
     d["age"] = age
     return d
 

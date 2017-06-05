@@ -286,13 +286,13 @@ def gibbs_control(par, lnprob, nsteps, niter, t, par_inds_list, args):
 
 
 # def estimate_covariance():
-def estimate_covariance(nstars):
+def estimate_covariance(nstars, fn):
     """
     Return the covariance matrix of the emcee samples.
     If there are more stars than the three that were used to construct this
     matrix, repeat the last five columns and rows nstar times.
     """
-    with h5py.File("emcee_posterior_samples.h5", "r") as f:
+    with h5py.File(fn, "r") as f:
         samples = f["action_samples"][...]
     cov = np.cov(samples, rowvar=False)
     return cov
