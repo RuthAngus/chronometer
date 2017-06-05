@@ -14,7 +14,7 @@ import h5py
 
 import corner
 import priors
-from models import gc_model, gyro_model, action_age
+from models import gyro_model, action_age, pure_gyro_model, pure_action_age
 import emcee
 
 from utils import replace_nans_with_inits, vk2teff, make_param_dict, \
@@ -51,7 +51,8 @@ def emcee_lnprob(params, *args):
                                                      bv[m]))
                             /period_errs[m])**2)
 
-    kin_lnlike = action_age(params[kin_inds], Jz, Jz_err)
+    mj = Jz > 0.
+    kin_lnlike = action_age(params[kin_inds], Jz[mj], Jz_err[mj])
 
     p = params*1
     p[nglob:nglob+N] = np.exp(p[nglob:nglob+N])  # mass
@@ -61,7 +62,6 @@ def emcee_lnprob(params, *args):
                       range(len(mods))])
     return gyro_lnlike + iso_lnlike + kin_lnlike + \
         emcee_lnprior(params, *args)
-    # return gyro_lnlike + emcee_lnprior(params, *args)
 
 
 def emcee_lnprior(params, *args):
@@ -94,16 +94,22 @@ if __name__ == "__main__":
     # Load the data for the initial parameter array.
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
     # d = pd.read_csv(os.path.join(DATA_DIR, "action_data.csv"))
-    d = pd.read_csv(os.path.join(DATA_DIR, "fake_action_data.csv"))
+    d = pd.read_csv(os.path.join(DATA_DIR, "fake_data.csv"))
+    N = 5
+    d = d.iloc[:N]
 
     # Generate the initial parameter array and the mods objects from the data
     global_params = np.array([.7725, .601, .5189, np.log(350.)])  # a b n beta
 
     params, mods = pars_and_mods(d, global_params)
+    print("intial parameters = ", params)
 
     # Set nsteps and niter.
     N, ngyro, nglob, nind = get_n_things(mods, params)
     print(N, "stars")
+    print(ngyro, "gyro parameters")
+    print(nglob, "global parameters")
+    print(nind, "parameters per star")
 
     # Construct parameter indices for the different parameter sets.
     par_inds = np.arange(len(params))  # All
@@ -113,21 +119,24 @@ if __name__ == "__main__":
     g_par_inds_mask = np.concatenate((g_par_inds[:3], g_par_inds[3:][m]))
 
     # A list of kinematic indices.
-    kin_inds = list(range(nglob+N, nglob+N+nind))
+    kin_inds = list(range(nglob+N, nglob+2*N))
     kin_inds.insert(0, ngyro)
 
-    emcee_args = [mods, d.prot.values,
-                  d.prot_err.values, d.bv.values, d.bv_err.values, d.Jz,
-                  d.Jz_err, N, ngyro, nglob, nind, g_par_inds_mask, kin_inds,
-                  m]
-    nwalkers, nsteps, ndim, mult = 64, 1000, len(params), 5
+    emcee_args = [mods, d.prot.values, d.prot_err.values, d.bv.values,
+                  d.bv_err.values, d.Jz, d.Jz_err, N, ngyro, nglob, nind,
+                  g_par_inds_mask, kin_inds, m]
+
+    # Test lnprob
+    print("lnprob = ", emcee_lnprob(params, *emcee_args))
+
+    nwalkers, nsteps, ndim, mult = 2*len(params) + 10, 10000, len(params), 5
     np.random.seed(1234)
     p0 = [1e-4*np.random.rand(ndim) + params for i in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, emcee_lnprob,
                                     args=emcee_args)
     print("burning in...")
     start = time.time()
-    pos, _, _ = sampler.run_mcmc(p0, nsteps)
+    pos, _, _ = sampler.run_mcmc(p0, nsteps*10)
     end = time.time()
     print("Time = ", (end - start)/60, "minutes")
     print("Predicted run time = ", (end - start)/60 * mult, "minutes")
@@ -144,20 +153,21 @@ if __name__ == "__main__":
     data[:, :] = flat
     f.close()
 
-    emcee_labels = ["$a$", "$b$", "$n$", "$\\beta$",
-                    "$\ln(Mass_1)$", "$\ln(Mass_2)$", "$\ln(Mass_3)$",
-                    "$\ln(Mass_4)$", "$\ln(Mass_5)$",
-                    "$\ln(Age_{1,i})$", "$\ln(Age_{2,i})$",
-                    "$\ln(Age_{3,i})$", "$\ln(Age_{4,i})$",
-                    "$\ln(Age_{5,i})$",
-                    "$[Fe/H]_1$", "$[Fe/H]_2$", "$[Fe/H]_3$",
-                    "$[Fe/H]_4$", "$[Fe/H]_5$",
-                    "$\ln(D_1)$", "$\ln(D_2)$", "$\ln(D_3)$",
-                    "$\ln(D_4)$", "$\ln(D_5)$",
-                    "$A_{v1}$", "$A_{v2}$", "$A_{v3}$",
-                    "$A_{v4}$", "$A_{v5}$"]
+    ml = ["$\ln(Mass_{})$".format(i) for i in range(N)]
+    al = ["$\ln(Age_{})$".format(i) for i in range(N)]
+    fl = ["$[Fe/H]_{}$".format(i) for i in range(N)]
+    dl = ["$\ln(D_{})$".format(i) for i in range(N)]
+    avl = ["$A_v{}$".format(i) for i in range(N)]
+    emcee_labels = ["$a$", "$b$", "$n$", "$\\beta$"] + ml + al + fl + dl + avl
+
+    t = pd.read_csv("truths.txt")
+    truths = np.concatenate((np.array(global_params),
+                             np.log(t.mass.values[:N]),
+                             np.log(t.age.values[:N]), t.feh.values[:N],
+                             np.log(t.distance.values[:N]), t.Av.values[:N]))
+
     print("Making corner plot")
-    fig = corner.corner(flat, labels=emcee_labels)
+    fig = corner.corner(flat, labels=emcee_labels, truths=truths)
     fig.savefig(os.path.join(RESULTS_DIR, "emcee_corner"))
 
     # Plot chains
