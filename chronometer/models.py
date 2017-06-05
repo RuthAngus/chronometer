@@ -68,16 +68,29 @@ def pure_action_age(par, ln_age, Jz, Jz_err):
         return -np.inf
 
 
-def action_age(par, Jz, Jz_err):
+def action_age(par, Jz, Jz_err, mj):
     """
     Given a vertical action, calculate an age.
     Vertical action dispersion increases with time.
     Vertical action is drawn from a Normal distribution with zero mean and
     dispersion that is a function of time.
     """
-    t = pd.read_csv("truths.txt")
     beta, ages = np.exp(par[0]), np.exp(par[1:])
-    ages = t.ages.values
+    if beta > 0:
+        return np.sum(-.5*(Jz[mj]**2/(beta*ages[mj] + Jz_err[mj]**2)) - \
+            .5*np.log(2*np.pi*(beta*ages[mj] + Jz_err[mj]**2)))
+    else:
+        return -np.inf
+
+
+def action_age_MH(par, Jz, Jz_err):
+    """
+    Given a vertical action, calculate an age.
+    Vertical action dispersion increases with time.
+    Vertical action is drawn from a Normal distribution with zero mean and
+    dispersion that is a function of time.
+    """
+    beta, ages = np.exp(par[0]), np.exp(par[1:])
     if beta > 0:
         return np.sum(-.5*(Jz**2/(beta*ages + Jz_err**2)) - \
             .5*np.log(2*np.pi*(beta*ages + Jz_err**2)))
