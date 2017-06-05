@@ -60,6 +60,10 @@ def emcee_lnprob(params, *args):
     p[nglob+3*N:nglob+4*N] = np.exp(p[nglob+3*N:nglob+4*N])  # dist
     iso_lnlike = sum([mods[i].lnlike(p[nglob+i::N]) for i in
                       range(len(mods))])
+
+    iso_lnlike = 0
+    # kin_lnlike = 0
+    gyro_lnlike = 0
     return gyro_lnlike + iso_lnlike + kin_lnlike + \
         emcee_lnprior(params, *args)
 
@@ -95,7 +99,7 @@ if __name__ == "__main__":
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
     # d = pd.read_csv(os.path.join(DATA_DIR, "action_data.csv"))
     d = pd.read_csv(os.path.join(DATA_DIR, "fake_data.csv"))
-    N = 5
+    N = 100
     d = d.iloc[:N]
 
     # Generate the initial parameter array and the mods objects from the data
