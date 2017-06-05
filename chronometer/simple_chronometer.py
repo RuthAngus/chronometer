@@ -9,9 +9,9 @@ import pandas as pd
 import corner
 import time
 
-from chronometer import get_n_things, estimate_covariance
+from chronometer import get_n_things, estimate_covariance, augment
 from utils import pars_and_mods
-from models import gyro_model, action_age
+from models import gyro_model, action_age, action_age_MH
 import priors
 
 
@@ -33,7 +33,7 @@ def lnprob(params, *args):
                                                     bv[mp]))
                             /period_errs[mp])**2)
 
-    kin_lnlike = action_age(params[kmask], Jz[mj], Jz_err[mj])
+    kin_lnlike = action_age_MH(params[kmask], Jz[mj], Jz_err[mj])
 
     p = params*1
     p[nglob:nglob+N] = np.exp(p[nglob:nglob+N])  # mass
@@ -42,8 +42,8 @@ def lnprob(params, *args):
     iso_lnlike = sum([mods[i].lnlike(p[nglob+i::N]) for i in
                       range(len(mods))])
 
-    gyro_lnlike = 0
-    kin_lnlike = 0
+    # gyro_lnlike = 0
+    # kin_lnlike = 0
     # iso_lnlike = 0
     return gyro_lnlike + iso_lnlike + kin_lnlike + lnprior(params, *args)
 
@@ -160,8 +160,9 @@ if __name__ == "__main__":
 
     # Load the data for the initial parameter array.
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
+    # d = pd.read_csv(os.path.join(DATA_DIR, "action_data.csv"))
     d = pd.read_csv(os.path.join(DATA_DIR, "fake_data.csv"))
-    d = d.iloc[:5]
+    d = d.iloc[:6]
 
     # Generate the initial parameter array and the mods objects from the data
     global_params = np.array([.7725, .601, .5189, np.log(350.)])  # a b n beta
@@ -174,8 +175,9 @@ if __name__ == "__main__":
     N, ngyro, nglob, nind = get_n_things(mods, params)
     print(N, "stars")
 
-    # Create the covariance matrices.
+    # Create the covariance matrix.
     t = estimate_covariance(N, "emcee_posterior_samples_0525.h5")
+    t = augment(t, N - 5, 5)
 
     start = time.time()
 
@@ -198,11 +200,11 @@ if __name__ == "__main__":
     avl = ["$A_v{}$".format(i) for i in range(N)]
     labels = ["$a$", "$b$", "$n$", "$\\beta$"] + ml + al + fl + dl + avl
 
-    t = pd.read_csv("truths.txt")
+    tr = pd.read_csv("truths.txt")
     truths = np.concatenate((np.array(global_params),
-                             np.log(t.mass.values[:N]),
-                             np.log(t.age.values[:N]), t.feh.values[:N],
-                             np.log(t.distance.values[:N]), t.Av.values[:N]))
+                             np.log(tr.mass.values[:N]),
+                             np.log(tr.age.values[:N]), tr.feh.values[:N],
+                             np.log(tr.distance.values[:N]), tr.Av.values[:N]))
 
     print("Making corner plot")
     fig = corner.corner(flat, truths=truths, labels=labels)
