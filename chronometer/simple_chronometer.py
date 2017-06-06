@@ -25,8 +25,11 @@ def lnprob(params, *args):
 
     mp = period > 0.
     mj = Jz > 0.
-    g_par_inds = np.array([0, 1, 2, 9, 10, 11, 12, 13])
-    k_par_inds = np.array([3, 9, 10, 11, 12, 13])
+    g_par_inds = np.concatenate((np.array([0, 1, 2]),
+                                 np.arange(nglob+N, nglob+2*N)))
+    k_par_inds = np.concatenate((np.array([3]), np.arange(nglob+N,
+                                                          nglob+2*N)))
+
     gmask = np.concatenate((g_par_inds[:3], g_par_inds[3:][mp]))
     kmask = np.concatenate((k_par_inds[:1], k_par_inds[1:][mj]))
     gyro_lnlike = sum(-.5*((period[mp] - gyro_model(params[gmask],

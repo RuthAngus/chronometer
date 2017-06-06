@@ -53,10 +53,6 @@ if __name__ == "__main__":
     distances = np.random.uniform(50, 1000, N)
     Avs = np.abs(np.random.randn(N) * .1)
 
-    truths = pd.DataFrame({"mass": masses, "age": ages, "feh": fehs,
-                           "distance": distances, "Av": Avs})
-    truths.to_csv("truths.txt")
-
     B, V, J, H, K = star_colors(masses, np.log10(ages*1e9), fehs, distances,
                                 Avs)
     periods = age2period(par, ages, B-V)
@@ -80,6 +76,8 @@ if __name__ == "__main__":
                                "hmag_err": errs[3], "prot": periods,
                                "prot_err": periods*.1, "tgas_parallax":
                                (1./distances)*1e3, "tgas_parallax_error":
-                               np.ones(len(B)), "Jz": Jz, "Jz_err": Jz_err})
+                               np.ones(len(B)), "Jz": Jz, "Jz_err": Jz_err,
+                               "mass": masses, "age": ages, "feh": fehs,
+                               "distance": distances, "Av": Avs})
 
     dictionary.to_csv("data/fake_data.csv")

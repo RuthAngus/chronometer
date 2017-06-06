@@ -52,7 +52,7 @@ def emcee_lnprob(params, *args):
                             /period_errs[m])**2)
 
     mj = Jz > 0.
-    kin_lnlike = action_age(params[kin_inds], Jz[mj], Jz_err[mj])
+    kin_lnlike = action_age(params[kin_inds], Jz, Jz_err, mj)
 
     p = params*1
     p[nglob:nglob+N] = np.exp(p[nglob:nglob+N])  # mass
@@ -61,9 +61,9 @@ def emcee_lnprob(params, *args):
     iso_lnlike = sum([mods[i].lnlike(p[nglob+i::N]) for i in
                       range(len(mods))])
 
-    iso_lnlike = 0
+    # iso_lnlike = 0
     # kin_lnlike = 0
-    gyro_lnlike = 0
+    # gyro_lnlike = 0
     return gyro_lnlike + iso_lnlike + kin_lnlike + \
         emcee_lnprior(params, *args)
 
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
     # d = pd.read_csv(os.path.join(DATA_DIR, "action_data.csv"))
     d = pd.read_csv(os.path.join(DATA_DIR, "fake_data.csv"))
-    N = 100
+    N = 3
     d = d.iloc[:N]
 
     # Generate the initial parameter array and the mods objects from the data
@@ -127,8 +127,8 @@ if __name__ == "__main__":
     kin_inds.insert(0, ngyro)
 
     emcee_args = [mods, d.prot.values, d.prot_err.values, d.bv.values,
-                  d.bv_err.values, d.Jz, d.Jz_err, N, ngyro, nglob, nind,
-                  g_par_inds_mask, kin_inds, m]
+                  d.bv_err.values, d.Jz.values, d.Jz_err.values, N, ngyro,
+                  nglob, nind, g_par_inds_mask, kin_inds, m]
 
     # Test lnprob
     print("lnprob = ", emcee_lnprob(params, *emcee_args))
@@ -164,11 +164,10 @@ if __name__ == "__main__":
     avl = ["$A_v{}$".format(i) for i in range(N)]
     emcee_labels = ["$a$", "$b$", "$n$", "$\\beta$"] + ml + al + fl + dl + avl
 
-    t = pd.read_csv("truths.txt")
     truths = np.concatenate((np.array(global_params),
-                             np.log(t.mass.values[:N]),
-                             np.log(t.age.values[:N]), t.feh.values[:N],
-                             np.log(t.distance.values[:N]), t.Av.values[:N]))
+                             np.log(d.mass.values[:N]),
+                             np.log(d.age.values[:N]), d.feh.values[:N],
+                             np.log(d.distance.values[:N]), d.Av.values[:N]))
 
     print("Making corner plot")
     fig = corner.corner(flat, labels=emcee_labels, truths=truths)
