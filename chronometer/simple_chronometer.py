@@ -9,11 +9,55 @@ import pandas as pd
 import corner
 import time
 import h5py
+import sys
 
-from chronometer import get_n_things, estimate_covariance, augment
 from utils import pars_and_mods
 from models import gyro_model, action_age, action_age_MH
 import priors
+
+
+def get_n_things(mods, params):
+    """
+    Figure out number of stars, number of global params, etc.
+    """
+    N, nind = len(mods), 5
+    ngyro = 3
+    nglob = 4
+    return N, ngyro, nglob, nind
+
+
+def estimate_covariance(nstars, fn):
+    """
+    Return the covariance matrix of the emcee samples.
+    If there are more stars than the three that were used to construct this
+    matrix, repeat the last five columns and rows nstar times.
+    """
+    with h5py.File(fn, "r") as f:
+        samples = f["action_samples"][...]
+    cov = np.cov(samples, rowvar=False)
+    return cov
+
+
+def augment(cov, N, npar):
+    """
+    Add the required number of parameters on to the covariance matrix.
+    Repeat the individual star covariances for the last star N times.
+    params:
+    ------
+    cov: (array)
+        A 2d array of parameter covariances.
+    N: (int)
+        The number of stars to add on.
+    npar: (int)
+        The number of parameters per star.
+    """
+    assert N >= 5, "Number of stars should be greater than 4."
+    for i in range(N):
+        new_col = cov[:, -npar:]  # select last npar columns.
+        aug_col = np.hstack((cov, new_col))  # Attach them to cov
+        new_row = np.hstack((cov[-npar:, :], cov[-npar:, -npar:]))  # new row
+        cov = np.vstack((aug_col, new_row))  # attach new row to cov.
+    return cov
 
 
 def lnprob(params, *args):
@@ -99,19 +143,6 @@ def MH(par, lnprob, nsteps, niter, t, *args):
     """
     samples = np.zeros((nsteps*len(par)*niter, len(par)))
 
-    labels = ["$a$", "$b$", "$n$", "$\\beta$",
-                    "$\ln(Mass_1)$", "$\ln(Mass_2)$", "$\ln(Mass_3)$",
-                    "$\ln(Mass_4)$", "$\ln(Mass_5)$",
-                    "$\ln(Age_{1,i})$", "$\ln(Age_{2,i})$",
-                    "$\ln(Age_{3,i})$", "$\ln(Age_{4,i})$",
-                    "$\ln(Age_{5,i})$",
-                    "$[Fe/H]_1$", "$[Fe/H]_2$", "$[Fe/H]_3$",
-                    "$[Fe/H]_4$", "$[Fe/H]_5$",
-                    "$\ln(D_1)$", "$\ln(D_2)$", "$\ln(D_3)$",
-                    "$\ln(D_4)$", "$\ln(D_5)$",
-                    "$A_{v1}$", "$A_{v2}$", "$A_{v3}$",
-                    "$A_{v4}$", "$A_{v5}$"]
-
     accept, probs = 0, []
     accept_list = [[] for i in range(len(par))]
     for k in range(niter):  # loop over iterations
@@ -131,16 +162,11 @@ def MH(par, lnprob, nsteps, niter, t, *args):
     return samples, par, probs
 
 
-def MH_step(par, lnprob, i, t, *args, emc=False):
+def MH_step(par, lnprob, i, t, *args):
     """
     A single Metropolis step.
-    if emc = True, the step is an emcee step instead.
-    emcee is run for 10 steps with 64 walkers and the final position is taken
-    as the step.
-    This is ridiculous but it should demonstrate that tuning is the problem.
     """
     newp = par*1
-    # t = np.ones_like(t) * .01  # FIXME
     newp[i] = (par + np.random.multivariate_normal(np.zeros((len(par))),
                                                    t))[i]
     new_lnprob = lnprob(newp, *args)
@@ -159,7 +185,7 @@ def MH_step(par, lnprob, i, t, *args, emc=False):
     return par, new_lnprob, accept
 
 
-def burnin(params, mods, args, t, niter=10000, nsteps=1):
+def burnin(params, mods, args, t, niter=10000, nsteps=1, clobber=False):
     """
     Run a single Gibbs chain until it has burnt in.
     params:
@@ -186,9 +212,19 @@ def burnin(params, mods, args, t, niter=10000, nsteps=1):
     parameters: (array)
         The array of final parameters that come out of burn in.
     """
-    flat, par, probs = MH(params, lnprob, nsteps, niter, t, *args)
-    df = {"params": [par]}
-    df.to_csv(os.path.join(RESULTS_DIR, "burnin_results.csv")
+    fn = os.path.join(RESULTS_DIR, "burnin_results.csv")
+    if not clobber and os.path_exists(fn):
+        df = pd.read_csv(fn)
+        par = df.par.values
+
+    else:
+        print("Running burn in...")
+        start = time.time()
+        flat, par, probs = MH(params, lnprob, nsteps, niter, t, *args)
+        end = time.time()
+        print("Time taken = ", (end - start)/60, "minutes")
+        df = {"params": [par]}
+        df.to_csv(fn)
     return par
 
 
@@ -203,14 +239,18 @@ def run_multiple_chains(fn, params, mods, args, t, niter=10000, nsteps=1,
         The name of the .h5 sample file.
     """
     # load burn in results
-    df = pd.read_csv(os.path.join(RESULTS_DIR, "burnin_results.csv")
+    df = pd.read_csv(os.path.join(RESULTS_DIR, "burnin_results.csv"))
     params = df.par.values
 
     # Run Gibbs
+    print("Running chain {}".format(fn))
+    start = time.time()
     flat, par, probs = MH(params, lnprob, nsteps, niter, t, *args)
+    end = time.time()
+    print("Time taken = ", (end - start)/60, "minutes")
 
     # Save samples
-    f = h5py.File(os.path.join(RESULTS_DIR, "{}.csv".format(fn)), "w")
+    f = h5py.File(os.path.join(RESULTS_DIR, "{}.h5".format(fn)), "w")
     data = f.create_dataset("samples", np.shape(flat))
     data[:, :] = flat
     f.close()
@@ -235,15 +275,36 @@ def run_multiple_chains(fn, params, mods, args, t, niter=10000, nsteps=1,
         fig.savefig(os.path.join(RESULTS_DIR, fn))
 
 
-def combine_samples(fn_list):
+def combine_samples(fn_list, fn):
     """
     Gather up the parallelised results into one set of samples.
     Calculate Gelman & Rubin convergence diagnostic.
+    params:
+    ------
+    fn_list: (list)
+        A list of the names of files containing samples you want to join
+        (exluding the .h5)
+    fn: (str)
+        New file name for all the samples.
     """
-    for fn in fn_list:
-        with h5py.File(os.path.join(RESULTS_DIR, "{}.csv".format(fn)),
-                       "r") as f:
+
+    # Load first set of samples
+    with h5py.File(os.path.join(RESULTS_DIR, "{}.h5".format(fn_list[0])),
+                   "r") as f:
         samples = f["samples"][...]
+
+    # Append subsequent sets of samples
+    for fl in fn_list[1:]:
+        with h5py.File(os.path.join(RESULTS_DIR, "{}.h5".format(fl)),
+                       "r") as f:
+            s = f["samples"][...]
+        samples = np.vstack((samples, s))
+
+    # Save large sample set.
+    fs = h5py.File(os.path.join(RESULTS_DIR, "{}.h5".format(fn)), "w")
+    data = fs.create_dataset("samples", np.shape(samples))
+    data[:, :] = samples
+    fs.close()
 
 
 if __name__ == "__main__":
@@ -270,8 +331,6 @@ if __name__ == "__main__":
     t = estimate_covariance(N, "emcee_posterior_samples_0525.h5")
     t = augment(t, N - 5, 5)
 
-    start = time.time()
-
     # Sample posteriors using MH gibbs
     args = [mods, d.prot.values, d.prot_err.values, d.bv.values,
             d.bv_err.values, d.Jz.values, d.Jz_err.values]
@@ -279,7 +338,11 @@ if __name__ == "__main__":
     # Test lnprob
     print("params = ", params)
     print("lnprob = ", lnprob(params, *args))
-    flat, par, probs = MH(params, lnprob, nsteps, niter, t, *args)
 
-    end = time.time()
-    print("Time taken = ", (end - start)/60, "minutes")
+    # burn in
+    params = burnin(params, mods, args, t, niter=10, nsteps=1, clobber=True)
+
+    # Run chains
+    fn = str(sys.argv[1])
+    run_multiple_chains(fn, params, mods, args, t, niter=10, nsteps=1,
+                        plot=True)
