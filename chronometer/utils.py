@@ -9,6 +9,50 @@ from isochrones import StarModel
 from isochrones.mist import MIST_Isochrone
 
 
+def get_n_things(mods, params):
+    """
+    Figure out number of stars, number of global params, etc.
+    """
+    N, nind = len(mods), 5
+    ngyro = 3
+    nglob = 4
+    return N, ngyro, nglob, nind
+
+
+def estimate_covariance(nstars, fn):
+    """
+    Return the covariance matrix of the emcee samples.
+    If there are more stars than the three that were used to construct this
+    matrix, repeat the last five columns and rows nstar times.
+    """
+    with h5py.File(fn, "r") as f:
+        samples = f["action_samples"][...]
+    cov = np.cov(samples, rowvar=False)
+    return cov
+
+
+def augment(cov, N, npar):
+    """
+    Add the required number of parameters on to the covariance matrix.
+    Repeat the individual star covariances for the last star N times.
+    params:
+    ------
+    cov: (array)
+        A 2d array of parameter covariances.
+    N: (int)
+        The number of stars to add on.
+    npar: (int)
+        The number of parameters per star.
+    """
+    assert N >= 5, "Number of stars should be greater than 4."
+    for i in range(N):
+        new_col = cov[:, -npar:]  # select last npar columns.
+        aug_col = np.hstack((cov, new_col))  # Attach them to cov
+        new_row = np.hstack((cov[-npar:, :], cov[-npar:, -npar:]))  # new row
+        cov = np.vstack((aug_col, new_row))  # attach new row to cov.
+    return cov
+
+
 def mask_column(d, col, val):
     """
     Turn all the NaNs into the val.
