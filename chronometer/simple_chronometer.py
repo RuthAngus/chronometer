@@ -311,16 +311,19 @@ if __name__ == "__main__":
     print("params = ", params)
     print("lnprob = ", lnprob(params, *args))
 
-    # burn in
-    # params = burnin(params, mods, args, t, niter=50000, nsteps=1,
-    #                 clobber=False)
-    # print("initial_params =", params)
+    if str(sys.argv[1]) == "run":
 
-    # Run chains
-    # fn = str(sys.argv[1])
-    # run_multiple_chains(fn, params, mods, args, t, niter=1000, nsteps=1,
-                        # plot=False)
+        # burn in
+        params = burnin(params, mods, args, t, niter=50000, nsteps=1,
+                        clobber=False)
+        print("initial_params =", params)
 
-    fn_list = ["0", "1", "2"]
-    fn = "combined_samples"
-    combine_samples(fn_list, fn)
+        # Run chains
+        fn = str(sys.argv[2])
+        run_multiple_chains(fn, params, mods, args, t, niter=1000, nsteps=1,
+                            plot=False)
+
+    if str(sys.argv[1]) == "combine":
+        fn_list = ["0", "1", "2", "3", "4", "5"]
+        fn = "combined_samples"
+        combine_samples(fn_list, fn)
