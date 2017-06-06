@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import corner
 import time
+import h5py
 
 from chronometer import get_n_things, estimate_covariance, augment
 from utils import pars_and_mods
@@ -158,6 +159,93 @@ def MH_step(par, lnprob, i, t, *args, emc=False):
     return par, new_lnprob, accept
 
 
+def burnin(params, mods, args, t, niter=10000, nsteps=1):
+    """
+    Run a single Gibbs chain until it has burnt in.
+    params:
+    ------
+    params: (array)
+        The initial parameter array. Should contain:
+        [a, b, n, beta, Mass_i, Age_i, Feh_i, Distance_i, Av_i, ...,
+        Mass_n, Age_n, Feh_n, Distance_n, Av_n] for stars i to n.
+    mods: (list)
+        A list of starmodel objects, created using colours and parallax.
+    args: (list)
+        A list of arguments to pass to the lnprob function.
+        Contains rotation periods, B-V colours and vertical actions.
+    t: (nd array)
+        The covariance matrix created during an emcee run, used for the
+        proposal distributions.
+    niter: (int)
+        The number of Gibbs sets or parameter cycles.
+    nsteps: (int)
+        The number of steps taken in each metropolis MCMC run.
+        Usually set to 1.
+    returns:
+    -------
+    parameters: (array)
+        The array of final parameters that come out of burn in.
+    """
+    flat, par, probs = MH(params, lnprob, nsteps, niter, t, *args)
+    df = {"params": [par]}
+    df.to_csv(os.path.join(RESULTS_DIR, "burnin_results.csv")
+    return par
+
+
+def run_multiple_chains(fn, params, mods, args, t, niter=10000, nsteps=1,
+                        plot=True):
+    """
+    After burn in, start several chains running. To run multiple chains, simply
+    run this function multiple times.
+    params:
+    ------
+    fn: (str)
+        The name of the .h5 sample file.
+    """
+    # load burn in results
+    df = pd.read_csv(os.path.join(RESULTS_DIR, "burnin_results.csv")
+    params = df.par.values
+
+    # Run Gibbs
+    flat, par, probs = MH(params, lnprob, nsteps, niter, t, *args)
+
+    # Save samples
+    f = h5py.File(os.path.join(RESULTS_DIR, "{}.csv".format(fn)), "w")
+    data = f.create_dataset("samples", np.shape(flat))
+    data[:, :] = flat
+    f.close()
+
+    # Make plot
+    if plot:
+        N, ngyro, nglob, nind = get_n_things(mods, params)
+        ml = ["$\ln(Mass_{})$".format(i) for i in range(N)]
+        al = ["$\ln(Age_{})$".format(i) for i in range(N)]
+        fl = ["$[Fe/H]_{}$".format(i) for i in range(N)]
+        dl = ["$\ln(D_{})$".format(i) for i in range(N)]
+        avl = ["$A_v{}$".format(i) for i in range(N)]
+        labels = ["$a$", "$b$", "$n$", "$\\beta$"] + ml + al + fl + dl + avl
+        tr = pd.read_csv("data/fake_data.csv")
+        truths = np.concatenate((np.array(global_params),
+                                 np.log(tr.mass.values[:N]),
+                                 np.log(tr.age.values[:N]), tr.feh.values[:N],
+                                 np.log(tr.distance.values[:N]),
+                                 tr.Av.values[:N]))
+        print("Making corner plot")
+        fig = corner.corner(flat, truths=truths, labels=labels)
+        fig.savefig(os.path.join(RESULTS_DIR, fn))
+
+
+def combine_samples(fn_list):
+    """
+    Gather up the parallelised results into one set of samples.
+    Calculate Gelman & Rubin convergence diagnostic.
+    """
+    for fn in fn_list:
+        with h5py.File(os.path.join(RESULTS_DIR, "{}.csv".format(fn)),
+                       "r") as f:
+        samples = f["samples"][...]
+
+
 if __name__ == "__main__":
     RESULTS_DIR = "/Users/ruthangus/projects/chronometer/chronometer/MH"
 
@@ -195,20 +283,3 @@ if __name__ == "__main__":
 
     end = time.time()
     print("Time taken = ", (end - start)/60, "minutes")
-
-    ml = ["$\ln(Mass_{})$".format(i) for i in range(N)]
-    al = ["$\ln(Age_{})$".format(i) for i in range(N)]
-    fl = ["$[Fe/H]_{}$".format(i) for i in range(N)]
-    dl = ["$\ln(D_{})$".format(i) for i in range(N)]
-    avl = ["$A_v{}$".format(i) for i in range(N)]
-    labels = ["$a$", "$b$", "$n$", "$\\beta$"] + ml + al + fl + dl + avl
-
-    tr = pd.read_csv("truths.txt")
-    truths = np.concatenate((np.array(global_params),
-                             np.log(tr.mass.values[:N]),
-                             np.log(tr.age.values[:N]), tr.feh.values[:N],
-                             np.log(tr.distance.values[:N]), tr.Av.values[:N]))
-
-    print("Making corner plot")
-    fig = corner.corner(flat, truths=truths, labels=labels)
-    fig.savefig(os.path.join(RESULTS_DIR, "simple_corner_gibbs"))
