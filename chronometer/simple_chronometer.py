@@ -166,9 +166,9 @@ def burnin(params, mods, args, t, niter=10000, nsteps=1, clobber=False):
         The array of final parameters that come out of burn in.
     """
     fn = os.path.join(RESULTS_DIR, "burnin_results.csv")
-    if not clobber and os.path_exists(fn):
+    if not clobber and os.path.exists(fn):
         df = pd.read_csv(fn)
-        par = df.par.values
+        par = df.params.values
 
     else:
         print("Running burn in...")
@@ -176,7 +176,7 @@ def burnin(params, mods, args, t, niter=10000, nsteps=1, clobber=False):
         flat, par, probs = MH(params, lnprob, nsteps, niter, t, *args)
         end = time.time()
         print("Time taken = ", (end - start)/60, "minutes")
-        df = {"params": [par]}
+        df = pd.DataFrame({"params": par})
         df.to_csv(fn)
     return par
 
@@ -193,7 +193,7 @@ def run_multiple_chains(fn, params, mods, args, t, niter=10000, nsteps=1,
     """
     # load burn in results
     df = pd.read_csv(os.path.join(RESULTS_DIR, "burnin_results.csv"))
-    params = df.par.values
+    params = df.params.values
 
     # Run Gibbs
     print("Running chain {}".format(fn))
@@ -228,7 +228,7 @@ def run_multiple_chains(fn, params, mods, args, t, niter=10000, nsteps=1,
         fig.savefig(os.path.join(RESULTS_DIR, fn))
 
 
-def combine_samples(fn_list, fn):
+def combine_samples(fn_list, fn, plot=True):
     """
     Gather up the parallelised results into one set of samples.
     Calculate Gelman & Rubin convergence diagnostic.
@@ -259,6 +259,25 @@ def combine_samples(fn_list, fn):
     data[:, :] = samples
     fs.close()
 
+    # Make plot
+    if plot:
+        N, ngyro, nglob, nind = get_n_things(mods, params)
+        ml = ["$\ln(Mass_{})$".format(i) for i in range(N)]
+        al = ["$\ln(Age_{})$".format(i) for i in range(N)]
+        fl = ["$[Fe/H]_{}$".format(i) for i in range(N)]
+        dl = ["$\ln(D_{})$".format(i) for i in range(N)]
+        avl = ["$A_v{}$".format(i) for i in range(N)]
+        labels = ["$a$", "$b$", "$n$", "$\\beta$"] + ml + al + fl + dl + avl
+        tr = pd.read_csv("data/fake_data.csv")
+        truths = np.concatenate((np.array(global_params),
+                                 np.log(tr.mass.values[:N]),
+                                 np.log(tr.age.values[:N]), tr.feh.values[:N],
+                                 np.log(tr.distance.values[:N]),
+                                 tr.Av.values[:N]))
+        print("Making corner plot")
+        fig = corner.corner(samples, truths=truths, labels=labels)
+        fig.savefig(os.path.join(RESULTS_DIR, fn))
+
 
 if __name__ == "__main__":
     RESULTS_DIR = "/Users/ruthangus/projects/chronometer/chronometer/MH"
@@ -267,7 +286,7 @@ if __name__ == "__main__":
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
     # d = pd.read_csv(os.path.join(DATA_DIR, "action_data.csv"))
     d = pd.read_csv(os.path.join(DATA_DIR, "fake_data.csv"))
-    d = d.iloc[:6]
+    d = d.iloc[:5]
 
     # Generate the initial parameter array and the mods objects from the data
     global_params = np.array([.7725, .601, .5189, np.log(350.)])  # a b n beta
@@ -293,9 +312,15 @@ if __name__ == "__main__":
     print("lnprob = ", lnprob(params, *args))
 
     # burn in
-    params = burnin(params, mods, args, t, niter=10, nsteps=1, clobber=True)
+    # params = burnin(params, mods, args, t, niter=50000, nsteps=1,
+    #                 clobber=False)
+    # print("initial_params =", params)
 
     # Run chains
-    fn = str(sys.argv[1])
-    run_multiple_chains(fn, params, mods, args, t, niter=10, nsteps=1,
-                        plot=True)
+    # fn = str(sys.argv[1])
+    # run_multiple_chains(fn, params, mods, args, t, niter=1000, nsteps=1,
+                        # plot=False)
+
+    fn_list = ["0", "1", "2"]
+    fn = "combined_samples"
+    combine_samples(fn_list, fn)

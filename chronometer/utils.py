@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from isochrones import StarModel
 from isochrones.mist import MIST_Isochrone
+import h5py
 
 
 def get_n_things(mods, params):
@@ -44,7 +45,7 @@ def augment(cov, N, npar):
     npar: (int)
         The number of parameters per star.
     """
-    assert N >= 5, "Number of stars should be greater than 4."
+    assert N >= 0, "Number of stars should be greater than or equal to 5."
     for i in range(N):
         new_col = cov[:, -npar:]  # select last npar columns.
         aug_col = np.hstack((cov, new_col))  # Attach them to cov
