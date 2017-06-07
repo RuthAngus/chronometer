@@ -281,10 +281,12 @@ def combine_samples(fn_list, fn, mods, params, plot=True):
 
 
 if __name__ == "__main__":
-    RESULTS_DIR = "/Users/ruthangus/projects/chronometer/chronometer/MH"
+
+    cwd = os.getcwd()
+    RESULTS_DIR = os.path.join(cwd, "MH")
+    DATA_DIR = os.path.join(cwd, "data")
 
     # Load the data for the initial parameter array.
-    DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
     # d = pd.read_csv(os.path.join(DATA_DIR, "action_data.csv"))
     d = pd.read_csv(os.path.join(DATA_DIR, "fake_data.csv"))
     d = d.iloc[:10]
