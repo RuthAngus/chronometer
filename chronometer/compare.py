@@ -9,6 +9,14 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import h5py
 
+plotpar = {'axes.labelsize': 18,
+           'font.size': 10,
+           'legend.fontsize': 18,
+           'xtick.labelsize': 18,
+           'ytick.labelsize': 18,
+           'text.usetex': True}
+plt.rcParams.update(plotpar)
+
 
 def get_stats_from_samples(samples):
     """
@@ -24,10 +32,20 @@ def get_stats_from_samples(samples):
     return meds, errm, errp
 
 
-def make_comparison_plot(true, recovered, xlabel, ylabel, fn):
+def make_comparison_plot(true, recovered, errp, errm, iso, ierrp, ierrm,
+                         xlabel, ylabel, fn):
     """
     Compare the true property with the injected property.
     """
+    xs = np.linspace(min(true), max(true))
+    plt.clf()
+    plt.errorbar(true, recovered, yerr=[errm, errp], fmt="k.")
+    plt.errorbar(true, iso, yerr=[ierrm, ierrp], fmt="m.", alpha=.5)
+    plt.plot(xs, xs, "--", color=".5")
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.subplots_adjust(bottom=.15)
+    plt.savefig(fn)
 
 
 if __name__ == "__main__":
@@ -35,30 +53,34 @@ if __name__ == "__main__":
     RESULTS_DIR = "/Users/ruthangus/projects/chronometer/chronometer/MH"
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
 
-    # Load truths
-    df = pd.read_csv(os.path.join(DATA_DIR, "fake_data.csv"))
-    true_ages = df.age.values
-
     # Load samples
     with h5py.File(os.path.join(RESULTS_DIR, "combined_samples.h5"),
                    "r") as f:
         samples = f["samples"][...]
 
+    # Find N stars
     npar = np.shape(samples)[1]
     N = int((npar - 4)/5)
     nglob = 4
-
     print(N, "stars")
 
+    # Load iso only samples
+    with h5py.File(os.path.join(RESULTS_DIR, "combined_samples_iso_only.h5"),
+                   "r") as f:
+        iso_samples = f["samples"][...]
+
+    # Calculate medians and errorbars
     recovered_age_samples = samples[:, nglob+N:nglob+2*N]
-    print(np.shape(recovered_age_samples))
+    meds, errm, errp = get_stats_from_samples(np.exp(recovered_age_samples))
+    iso_age_samples = iso_samples[:, nglob+N:nglob+2*N]
+    iso, ierrm, ierrp = get_stats_from_samples(np.exp(iso_age_samples))
 
-    samples = np.zeros((1000, 5))
-    samples[:, 0] = np.log(np.random.randn(1000)*1 + 100)
-    samples[:, 1] = np.log(np.random.randn(1000)*2 + 101)
-    samples[:, 2] = np.log(np.random.randn(1000)*3 + 102)
-    samples[:, 3] = np.log(np.random.randn(1000)*4 + 103)
-    samples[:, 4] = np.log(np.random.randn(1000)*5 + 104)
+    # Load truths
+    df = pd.read_csv(os.path.join(DATA_DIR, "fake_data.csv"))
+    true_ages = df.age.values[:N]
 
-    meds, errm, errp = get_stats_from_samples(np.exp(samples))
-    print(meds, errm, errp)
+    # Make plot
+    make_comparison_plot(true_ages, meds, errp, errm, iso, ierrp, ierrm,
+                         "$\mathrm{True~age~(Gyr)}$",
+                         "$\mathrm{Recovered~age~(Gyr)}$",
+                         "compare_ages_{}".format(N))

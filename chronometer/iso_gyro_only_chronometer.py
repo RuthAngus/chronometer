@@ -160,7 +160,7 @@ def burnin(params, mods, args, t, niter=10000, nsteps=1, clobber=False):
     parameters: (array)
         The array of final parameters that come out of burn in.
     """
-    fn = os.path.join(RESULTS_DIR, "burnin_results.csv")
+    fn = os.path.join(RESULTS_DIR, "burnin_results_{}.csv".format(len(mods)))
     if not clobber and os.path.exists(fn):
         df = pd.read_csv(fn)
         par = df.params.values
@@ -317,7 +317,7 @@ if __name__ == "__main__":
         fn1 = str(sys.argv[2])
         fn = "{}_iso_gyro".format(fn1)
         run_multiple_chains(fn, params, mods, args, t, niter=10000, nsteps=1,
-                            plot=True)
+                            plot=False)
 
     if str(sys.argv[1]) == "combine":
         fn_list = ["0_iso_gyro", "1_iso_gyro", "2_iso_gyro", "3_iso_gyro",

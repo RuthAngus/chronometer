@@ -165,7 +165,7 @@ def burnin(params, mods, args, t, niter=10000, nsteps=1, clobber=False):
     parameters: (array)
         The array of final parameters that come out of burn in.
     """
-    fn = os.path.join(RESULTS_DIR, "burnin_results.csv")
+    fn = os.path.join(RESULTS_DIR, "burnin_results_{}.csv".format(len(mods)))
     if not clobber and os.path.exists(fn):
         df = pd.read_csv(fn)
         par = df.params.values
@@ -192,7 +192,8 @@ def run_multiple_chains(fn, params, mods, args, t, niter=10000, nsteps=1,
         The name of the .h5 sample file.
     """
     # load burn in results
-    df = pd.read_csv(os.path.join(RESULTS_DIR, "burnin_results.csv"))
+    df = pd.read_csv(os.path.join(RESULTS_DIR,
+                                  "burnin_results_{}.csv".format(len(mods))))
     params = df.params.values
 
     # Run Gibbs
@@ -228,7 +229,7 @@ def run_multiple_chains(fn, params, mods, args, t, niter=10000, nsteps=1,
         fig.savefig(os.path.join(RESULTS_DIR, fn))
 
 
-def combine_samples(fn_list, fn, plot=True):
+def combine_samples(fn_list, fn, mods, params, plot=True):
     """
     Gather up the parallelised results into one set of samples.
     Calculate Gelman & Rubin convergence diagnostic.
@@ -286,17 +287,17 @@ if __name__ == "__main__":
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
     # d = pd.read_csv(os.path.join(DATA_DIR, "action_data.csv"))
     d = pd.read_csv(os.path.join(DATA_DIR, "fake_data.csv"))
-    d = d.iloc[:5]
+    d = d.iloc[:10]
 
     # Generate the initial parameter array and the mods objects from the data
     global_params = np.array([.7725, .601, .5189, np.log(350.)])  # a b n beta
 
-    params, mods = pars_and_mods(d, global_params)
+    init_params, mods = pars_and_mods(d, global_params)
 
     # Set nsteps and niter.
     nsteps = 1
     niter = 10000
-    N, ngyro, nglob, nind = get_n_things(mods, params)
+    N, ngyro, nglob, nind = get_n_things(mods, init_params)
     print(N, "stars")
 
     # Create the covariance matrix.
@@ -308,22 +309,23 @@ if __name__ == "__main__":
             d.bv_err.values, d.Jz.values, d.Jz_err.values]
 
     # Test lnprob
-    print("params = ", params)
-    print("lnprob = ", lnprob(params, *args))
+    print("params = ", init_params)
+    print("lnprob = ", lnprob(init_params, *args))
 
     if str(sys.argv[1]) == "run":
 
         # burn in
-        params = burnin(params, mods, args, t, niter=50000, nsteps=1,
+        params = burnin(init_params, mods, args, t, niter=50000, nsteps=1,
                         clobber=False)
         print("initial_params =", params)
+        assert len(params) == len(init_params), "You need to redo the burn in"
 
         # Run chains
         fn = str(sys.argv[2])
-        run_multiple_chains(fn, params, mods, args, t, niter=1000, nsteps=1,
+        run_multiple_chains(fn, params, mods, args, t, niter=5000, nsteps=1,
                             plot=False)
 
     if str(sys.argv[1]) == "combine":
-        fn_list = ["0", "1", "2", "3", "4", "5"]
+        fn_list = ["0", "1", "2", "3"]
         fn = "combined_samples"
-        combine_samples(fn_list, fn)
+        combine_samples(fn_list, fn, mods, init_params)

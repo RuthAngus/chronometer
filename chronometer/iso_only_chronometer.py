@@ -151,7 +151,7 @@ def burnin(params, mods, args, t, niter=10000, nsteps=1, clobber=False):
     parameters: (array)
         The array of final parameters that come out of burn in.
     """
-    fn = os.path.join(RESULTS_DIR, "burnin_results.csv")
+    fn = os.path.join(RESULTS_DIR, "burnin_results_{}.csv".format(len(mods)))
     if not clobber and os.path.exists(fn):
         df = pd.read_csv(fn)
         par = df.params.values
@@ -178,7 +178,8 @@ def run_multiple_chains(fn, params, mods, args, t, niter=10000, nsteps=1,
         The name of the .h5 sample file.
     """
     # load burn in results
-    df = pd.read_csv(os.path.join(RESULTS_DIR, "burnin_results.csv"))
+    df = pd.read_csv(os.path.join(RESULTS_DIR,
+                                  "burnin_results_{}.csv".format(len(mods))))
     params = df.params.values
 
     # Run Gibbs
@@ -214,7 +215,7 @@ def run_multiple_chains(fn, params, mods, args, t, niter=10000, nsteps=1,
         fig.savefig(os.path.join(RESULTS_DIR, fn))
 
 
-def combine_samples(fn_list, fn, plot=True):
+def combine_samples(fn_list, fn, mods, params, plot=True):
     """
     Gather up the parallelised results into one set of samples.
     Calculate Gelman & Rubin convergence diagnostic.
@@ -272,7 +273,7 @@ if __name__ == "__main__":
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
     # d = pd.read_csv(os.path.join(DATA_DIR, "action_data.csv"))
     d = pd.read_csv(os.path.join(DATA_DIR, "fake_data.csv"))
-    d = d.iloc[:5]
+    d = d.iloc[:10]
 
     # Generate the initial parameter array and the mods objects from the data
     global_params = np.array([.7725, .601, .5189, np.log(350.)])  # a b n beta
@@ -307,10 +308,10 @@ if __name__ == "__main__":
         # Run chains
         fn1 = str(sys.argv[2])
         fn = "{}_iso".format(fn1)
-        run_multiple_chains(fn, params, mods, args, t, niter=10000, nsteps=1,
-                            plot=True)
+        run_multiple_chains(fn, params, mods, args, t, niter=5000, nsteps=1,
+                            plot=False)
 
     if str(sys.argv[1]) == "combine":
-        fn_list = ["0_iso", "1_iso", "2_iso", "3_iso", "4_iso", "5_iso"]
+        fn_list = ["0_iso", "1_iso", "2_iso", "3_iso"]
         fn = "combined_samples_iso_only"
-        combine_samples(fn_list, fn)
+        combine_samples(fn_list, fn, mods, params, plot=False)
