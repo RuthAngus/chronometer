@@ -204,7 +204,8 @@ def run_multiple_chains(fn, params, mods, args, t, niter=10000, nsteps=1,
     print("Time taken = ", (end - start)/60, "minutes")
 
     # Save samples
-    f = h5py.File(os.path.join(RESULTS_DIR, "{}.h5".format(fn)), "w")
+    f = h5py.File(os.path.join(RESULTS_DIR, "{}_{}.h5".format(fn, len(mods))),
+            "w")
     data = f.create_dataset("samples", np.shape(flat))
     data[:, :] = flat
     f.close()
@@ -218,7 +219,7 @@ def run_multiple_chains(fn, params, mods, args, t, niter=10000, nsteps=1,
         dl = ["$\ln(D_{})$".format(i) for i in range(N)]
         avl = ["$A_v{}$".format(i) for i in range(N)]
         labels = ["$a$", "$b$", "$n$", "$\\beta$"] + ml + al + fl + dl + avl
-        tr = pd.read_csv("data/fake_data.csv")
+        tr = pd.read_csv("data/action_data.csv")
         truths = np.concatenate((np.array(global_params),
                                  np.log(tr.mass.values[:N]),
                                  np.log(tr.age.values[:N]), tr.feh.values[:N],
@@ -283,12 +284,13 @@ def combine_samples(fn_list, fn, mods, params, plot=True):
 if __name__ == "__main__":
 
     cwd = os.getcwd()
-    RESULTS_DIR = os.path.join(cwd, "MH")
+#     RESULTS_DIR = os.path.join(cwd, "MH")
+    RESULTS_DIR = os.path.join(cwd, "results")
     DATA_DIR = os.path.join(cwd, "data")
 
     # Load the data for the initial parameter array.
-    # d = pd.read_csv(os.path.join(DATA_DIR, "action_data.csv"))
-    d = pd.read_csv(os.path.join(DATA_DIR, "fake_data.csv"))
+    d = pd.read_csv(os.path.join(DATA_DIR, "action_data.csv"))
+#     d = pd.read_csv(os.path.join(DATA_DIR, "fake_data.csv"))
     d = d.iloc[:10]
 
     # Generate the initial parameter array and the mods objects from the data
@@ -317,8 +319,9 @@ if __name__ == "__main__":
     if str(sys.argv[1]) == "run":
 
         # burn in
-        params = burnin(init_params, mods, args, t, niter=50000, nsteps=1,
+        params = burnin(init_params, mods, args, t, niter=100000, nsteps=1,
                         clobber=False)
+
         print("initial_params =", params)
         assert len(params) == len(init_params), "You need to redo the burn in"
 
@@ -328,6 +331,6 @@ if __name__ == "__main__":
                             plot=False)
 
     if str(sys.argv[1]) == "combine":
-        fn_list = ["0", "1", "2", "3"]
+        fn_list = ["0", "1", "2", "3", "4", "6"]
         fn = "combined_samples"
-        combine_samples(fn_list, fn, mods, init_params)
+        combine_samples(fn_list, fn, mods, init_params, plot=False)
