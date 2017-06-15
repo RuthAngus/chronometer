@@ -139,15 +139,15 @@ def make_param_dict(d, i):
     param_dict = {"J": (d.jmag.values[i], d.jmag_err.values[i]),
                   "H": (d.hmag.values[i], d.hmag_err.values[i]),
                   "K": (d.kmag.values[i], d.kmag_err.values[i]),
+                  "Teff": (d.teff.values[i], d.teff_err1.values[i]),
+                  "logg": (d.logg.values[i], d.logg_err1.values[i]),
+                  "feh": (d.feh.values[i], d.feh_err1.values[i]),
                   "parallax": (d.tgas_parallax.values[i],
                                d.tgas_parallax_error.values[i])}  # FIXME: add more filters
                   # "G": (d.tgas_phot_g_mean_mag.values[i],
                   #       d.tgas_phot_g_mean_flux_error.values[i]/
                   #       d.tgas_phot_g_mean_flux.values[i] *
                   #       d.tgas_phot_g_mean_mag.values[i]),
-                  # "Teff": (d.teff.values[i], d.teff_err1.values[i]),
-                  # "logg": (d.logg.values[i], d.logg_err1.values[i]),
-                  # "feh": (d.feh.values[i], d.feh_err1.values[i]),
     return param_dict
 
 

@@ -57,22 +57,14 @@ def calculate_isochronal_age(param_dict, i, RESULTS_DIR):
     p[2] = 0.  # df.feh.values[i]
     p[3] = 100. # 1./(df.tgas_parallax.values[i])*1e3
     p[4] = 0.  # df.Av.values[i]
-    # Replace nans
-    if not np.isfinite(p[0]):
-        p[0] = 1.
-    if not np.isfinite(p[1]):
-        p[1] = 9.
-    if not np.isfinite(p[2]):
-        p[2] = 0.
-    if not np.isfinite(p[3]):
-        p[3] = 1.
-    if not np.isfinite(p[4]):
-        p[4] = 0.
 
-    mod = StarModel(mist, **param_dict)
+    if type(param_dict) == dict:
+        mod = StarModel(mist, **param_dict)
+    else:
+        mod = param_dict
 
     # Run emcee
-    nwalkers, nsteps, ndim, mult = 32, 5000, len(p), 5
+    nwalkers, nsteps, ndim, mult = 32, 10000, len(p), 5
     p0 = [1e-4*np.random.rand(ndim) + p for i in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=[mod])
     print("burning in...")
@@ -103,9 +95,13 @@ def calculate_isochronal_age(param_dict, i, RESULTS_DIR):
     lower = np.percentile(flat[:, 1], 16)
     upper = np.percentile(flat[:, 1], 84)
     logerrm, logerrp = med - lower, upper - med
-    errp = logerrp/med * (10**med)*1e-9
-    errm = logerrm/med * (10**med)*1e-9
-    return (10**med)*1e-9, errm, errp, flat[:, 1]
+    errp = logerrp/med
+    errm = logerrm/med
+    return med, errm, errp, flat[:, 1]
+    # errp = 10**(logerrp/med)*1e-9
+    # errm = 10**(logerrm/med)*1e-9
+    # return (10**med)*1e-9, errm, errp, flat[:, 1]
+
 
 def calculate_gyrochronal_ages(par, period, bv):
 
@@ -129,10 +125,7 @@ def loop_over_stars(df, par, number, RESULTS_DIR, clobber=False):
         bvs = tbv.teff2bv(teffs, loggs, fehs)
 
     periods = df.prot.values[:number]
-    gyro_age = calculate_gyrochronal_ages(par, periods, bvs)
-    print(periods)
-    print(bvs)
-    print(gyro_age)
+    gyro_age = calculate_gyrochronal_ages(par, periods, bvs[:number])
 
     iso_ages, iso_errm, iso_errp, gyro_ages = [], [], [], []
     for i, star in enumerate(df.jmag.values[:number]):
@@ -202,9 +195,9 @@ if __name__ == "__main__":
     df = pd.read_csv(os.path.join(DATA_DIR, "fake_data.csv"))
 
     par = np.array([.7725, .60, .4, .5189])
-    iso_ages, iso_errm, iso_errp, gyro_ages = loop_over_stars(df, par, 100,
+    iso_ages, iso_errm, iso_errp, gyro_ages = loop_over_stars(df, par, 3,
                                                               RESULTS_DIR,
-                                                              clobber=False)
+                                                              clobber=True)
     plot_gyro_age_against_iso_age(iso_ages, iso_errm, iso_errp, gyro_ages,
                                   "fake_data")
                                   # "real_data_more")

@@ -46,10 +46,15 @@ def make_comparison_plot(true, recovered, errp, errm, iso, ierrp, ierrm,
     plt.ylabel(ylabel)
     plt.subplots_adjust(bottom=.15)
     plt.savefig(fn)
+    print(np.median(errm), np.median(errp), np.median(ierrm),
+          np.median(ierrp))
+    print(np.mean([np.median(ierrm), np.median(ierrp)])
+          /np.mean([np.median(errm), np.median(errp)]))
 
 
 if __name__ == "__main__":
 
+    cwd = os.getcwd()
     RESULTS_DIR = "/Users/ruthangus/projects/chronometer/chronometer/MH"
     DATA_DIR = "/Users/ruthangus/projects/chronometer/chronometer/data"
 

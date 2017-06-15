@@ -34,7 +34,9 @@ def add_actions_and_colours(df, fn):
 
     # Calculate B-Vs
     bv = tbv.teff2bv(df.teff.values, df.logg.values, df.feh.values)
+    bv_err = bv * .01
     df["bv"] = bv
+    df["bv_err"] = bv_err
 
     # Calculate actions
     action_array = convert_coords_to_actions(df)
